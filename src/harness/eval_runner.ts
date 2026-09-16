@@ -441,24 +441,28 @@ export function runStockTraceEvaluationSuite(): {
   };
 }
 
-// Direct execution when invoked via CLI/tsx
-const suite = runStockTraceEvaluationSuite();
-console.log('================================================================');
-console.log('STOCKTRACE MASTER BUILD EVALUATION SUITE (SECTION 24)');
-console.log('================================================================');
-console.log(`Total Cases: ${suite.total} | Passed: ${suite.passed} | Failed: ${suite.failed}\n`);
+// Direct execution when invoked via CLI/tsx (bypassed in browser/Vite runtime)
+const isViteOrBrowser = typeof window !== 'undefined' || Boolean(import.meta.env);
 
-for (const r of suite.results) {
-  const icon = r.passed ? '✓ PASS' : '✗ FAIL';
-  console.log(`[${icon}] ${r.id}: ${r.title}`);
-  console.log(`       Note: ${r.notes}`);
+if (!isViteOrBrowser) {
+  const suite = runStockTraceEvaluationSuite();
+  console.log('================================================================');
+  console.log('STOCKTRACE MASTER BUILD EVALUATION SUITE (SECTION 24)');
+  console.log('================================================================');
+  console.log(`Total Cases: ${suite.total} | Passed: ${suite.passed} | Failed: ${suite.failed}\n`);
+
+  for (const r of suite.results) {
+    const icon = r.passed ? '✓ PASS' : '✗ FAIL';
+    console.log(`[${icon}] ${r.id}: ${r.title}`);
+    console.log(`       Note: ${r.notes}`);
+  }
+
+  console.log('================================================================');
+
+  if (suite.failed > 0) {
+    throw new Error(`StockTrace evaluation suite failed: ${suite.failed} case(s) failed.`);
+  } else {
+    console.log('ALL SPECIFICATION EVALUATION CASES PASSED PERFECTLY (10/10).');
+  }
 }
 
-console.log('================================================================');
-
-if (suite.failed > 0) {
-  process.exit(1);
-} else {
-  console.log('ALL SPECIFICATION EVALUATION CASES PASSED PERFECTLY (10/10).');
-  process.exit(0);
-}
