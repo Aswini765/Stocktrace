@@ -1,0 +1,7 @@
+{
+  "name": "StockTrace",
+  "description": "Inventory Movement & Location Intelligence",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
