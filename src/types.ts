@@ -21,6 +21,14 @@ export type CaseStatus =
   | 'RESOLVED'
   | 'ESCALATED';
 
+export type WorkerVerificationOutcome =
+  | 'FOUND'
+  | 'NOT_FOUND'
+  | 'PARTIALLY_FOUND'
+  | 'WRONG_QUANTITY'
+  | 'DAMAGED'
+  | 'ESCALATE';
+
 export interface FailedPickCase {
   id: string;
   sku: string;

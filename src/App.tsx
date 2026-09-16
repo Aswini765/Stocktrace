@@ -5,6 +5,7 @@ import {
   FailedPickCase,
   InvestigationRecord,
   DiscrepancyRecord,
+  WorkerVerificationOutcome,
 } from './types';
 import {
   INITIAL_FAILED_CASES,
@@ -21,6 +22,7 @@ import { DashboardView } from './components/DashboardView';
 import { InvestigationsView } from './components/InvestigationsView';
 import { DiscrepanciesView } from './components/DiscrepanciesView';
 import { DataSourcesView } from './components/DataSourcesView';
+import { SopGuidanceModal } from './components/SopGuidanceModal';
 import { CheckCircle2, X } from 'lucide-react';
 
 export default function App() {
@@ -29,6 +31,7 @@ export default function App() {
   const [currentScenario, setCurrentScenario] = useState<ScenarioType>('happy-path');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isSopModalOpen, setIsSopModalOpen] = useState<boolean>(false);
 
   // Collections state
   const [cases, setCases] = useState<FailedPickCase[]>(INITIAL_FAILED_CASES);
@@ -91,6 +94,9 @@ export default function App() {
     resolutionTime: string;
     evidence: string;
     status: 'Resolved' | 'Escalated';
+    outcome?: WorkerVerificationOutcome;
+    foundQuantity?: number;
+    discrepancyReason?: string;
   }) => {
     const invId =
       details.sku === 'SKU-1042'
@@ -116,31 +122,49 @@ export default function App() {
       reason:
         details.status === 'Resolved'
           ? `Physically verified at ${details.verifiedLocation}`
-          : 'Physically checked at recommended location; item absent. Escalated to warehouse supervisor.',
+          : details.discrepancyReason || 'Physically checked; discrepancy logged. Escalated to supervisor.',
     };
 
     setInvestigations((prev) => [newInv, ...prev.filter((i) => i.id !== invId)]);
 
+    const discReason =
+      details.discrepancyReason ||
+      (details.status === 'Resolved'
+        ? 'Item found at unexpected location following camera trace'
+        : `Verification result: ${details.outcome || 'NOT_FOUND'} at ${details.verifiedLocation}`);
+
+    const newDisc: DiscrepancyRecord = {
+      id: discId,
+      caseId: activeCaseId || undefined,
+      taskId: activeCaseId || undefined,
+      sku: details.sku,
+      itemName: details.itemName,
+      expectedLocation: details.expectedLocation,
+      foundLocation: details.verifiedLocation,
+      reason: discReason,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      evidence: details.evidence,
+      status: details.status === 'Resolved' ? 'Resolved' : 'Pending Review',
+      resolvedBy: 'Floor Picker #12 (Rajesh K.)',
+    };
+
+    setDiscrepancies((prev) => [newDisc, ...prev.filter((d) => d.id !== discId)]);
+
     if (details.status === 'Resolved') {
-      const newDisc: DiscrepancyRecord = {
-        id: discId,
-        caseId: activeCaseId || undefined,
-        taskId: activeCaseId || undefined,
-        sku: details.sku,
-        itemName: details.itemName,
-        expectedLocation: details.expectedLocation,
-        foundLocation: details.verifiedLocation,
-        reason: 'Item found at unexpected location following camera trace',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        evidence: details.evidence,
-        status: 'Resolved',
-        resolvedBy: 'Floor Picker #12 (Rajesh K.)',
-      };
-
-      setDiscrepancies((prev) => [newDisc, ...prev.filter((d) => d.id !== discId)]);
-
       setResolutionNotice(
         `✓ ${details.sku} resolved: Found at ${details.verifiedLocation}. Case moved to Completed Cases.`
+      );
+    } else if (details.outcome === 'PARTIALLY_FOUND') {
+      setResolutionNotice(
+        `⚠ ${details.sku} partially found (${details.foundQuantity} units). Discrepancy recorded for supervisor review.`
+      );
+    } else if (details.outcome === 'WRONG_QUANTITY') {
+      setResolutionNotice(
+        `⚠ ${details.sku} quantity discrepancy recorded (${details.foundQuantity} units found). Case escalated.`
+      );
+    } else if (details.outcome === 'DAMAGED') {
+      setResolutionNotice(
+        `⚠ ${details.sku} logged as DAMAGED. Case escalated for supervisor inventory inspection.`
       );
     } else {
       setResolutionNotice(`⚠ ${details.sku} escalated to Warehouse Supervisor review.`);
@@ -153,11 +177,18 @@ export default function App() {
           ? {
               ...c,
               status: details.status === 'Resolved' ? 'RESOLVED' : 'ESCALATED',
-              foundLocation: details.status === 'Resolved' ? details.verifiedLocation : undefined,
+              foundLocation:
+                details.status === 'Resolved'
+                  ? details.verifiedLocation
+                  : details.outcome === 'PARTIALLY_FOUND' ||
+                    details.outcome === 'WRONG_QUANTITY' ||
+                    details.outcome === 'DAMAGED'
+                  ? details.verifiedLocation
+                  : undefined,
               resolutionTime: details.resolutionTime,
               completedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               investigationId: invId,
-              discrepancyId: details.status === 'Resolved' ? discId : undefined,
+              discrepancyId: discId,
             }
           : c
       )
@@ -194,7 +225,10 @@ export default function App() {
       {/* Main app viewport */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overflow-x-hidden">
         {/* Top operational bar */}
-        <TopBar onOpenMobileMenu={() => setIsMobileMenuOpen(true)} />
+        <TopBar
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+          onOpenSopModal={() => setIsSopModalOpen(true)}
+        />
 
         {/* Global resolution notice banner */}
         {resolutionNotice && (
@@ -279,6 +313,12 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Warehouse SOP Operational Guidance Modal */}
+      <SopGuidanceModal
+        isOpen={isSopModalOpen}
+        onClose={() => setIsSopModalOpen(false)}
+      />
     </div>
   );
 }

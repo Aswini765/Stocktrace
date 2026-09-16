@@ -49,7 +49,7 @@ export class GmailConnector implements EmailProvider {
     this.defaultRecipient =
       defaultRecipient ||
       (import.meta.env.VITE_SUPERVISOR_EMAIL as string) ||
-      'aswini.27196@gmail.com';
+      '';
   }
 
   /**

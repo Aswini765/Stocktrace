@@ -9,7 +9,7 @@ import {
   Loader2,
   Mail,
 } from 'lucide-react';
-import { FailedPickCase, ScenarioType } from '../types';
+import { FailedPickCase, ScenarioType, WorkerVerificationOutcome } from '../types';
 import { CameraVideoPlayerModal, CameraFootageItem } from './CameraVideoPlayerModal';
 import { stockTraceEngine, InvestigationExecutionResult } from '../harness/case_engine';
 import { SCANNER_TRANSACTIONS, CAMERA_EVENTS } from '../data/mockData';
@@ -26,6 +26,9 @@ interface CaseResolutionFlowProps {
     resolutionTime: string;
     evidence: string;
     status: 'Resolved' | 'Escalated';
+    outcome?: WorkerVerificationOutcome;
+    foundQuantity?: number;
+    discrepancyReason?: string;
   }) => void;
   onBackToOpenCases: () => void;
   onResetCase?: () => void;
@@ -112,6 +115,17 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
   // Outbound Email Notification feedback state
   const [emailNotificationResult, setEmailNotificationResult] = useState<SendEmailResult | null>(null);
 
+  // Worker verification state
+  const [lastOutcome, setLastOutcome] = useState<WorkerVerificationOutcome | null>(null);
+  const [activeSubAction, setActiveSubAction] = useState<
+    'PARTIALLY_FOUND' | 'WRONG_QUANTITY' | 'DAMAGED' | null
+  >(null);
+  const [partialCount, setPartialCount] = useState<number>(
+    caseData.qty > 1 ? caseData.qty - 1 : 1
+  );
+  const [wrongCount, setWrongCount] = useState<number>(0);
+  const [damageNotes, setDamageNotes] = useState<string>('Packaging crushed / inventory unusable');
+
   // Derive active camera events based on scenario and SKU
   const currentCameraEvents =
     activeScenario === 'no-camera' || activeScenario === 'scanner-only'
@@ -178,110 +192,129 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
     setCurrentStep('finding-item');
   };
 
-  const handleFound = () => {
-    setCurrentStep('result-found');
+  const handleVerifyOutcome = (
+    outcome: WorkerVerificationOutcome,
+    actualQty?: number,
+    notes?: string
+  ) => {
+    setLastOutcome(outcome);
+    setActiveSubAction(null);
     const recommendedLoc = investigationResult?.evaluation.topCandidate?.location || 'B07';
-    stockTraceEngine.recordWorkerVerification({
-      caseId: caseData.id,
-      outcome: 'FOUND',
-      verifiedLocation: recommendedLoc,
-      actualQuantity: caseData.qty,
-    });
 
-    onCompleteResolution({
-      sku: caseData.sku,
-      itemName: caseData.item,
-      expectedLocation: caseData.expectedLocation,
-      verifiedLocation: recommendedLoc,
-      resolutionTime: '02:41',
-      evidence: `StockTrace verified (${caseData.expectedLocation} → ${recommendedLoc})`,
-      status: 'Resolved',
-    });
-  };
+    if (outcome === 'FOUND') {
+      setCurrentStep('result-found');
+      stockTraceEngine.recordWorkerVerification({
+        caseId: caseData.id,
+        outcome: 'FOUND',
+        verifiedLocation: recommendedLoc,
+        actualQuantity: caseData.qty,
+      });
 
-  const handleNotFound = () => {
+      onCompleteResolution({
+        sku: caseData.sku,
+        itemName: caseData.item,
+        expectedLocation: caseData.expectedLocation,
+        verifiedLocation: recommendedLoc,
+        resolutionTime: '02:41',
+        evidence: `StockTrace verified (${caseData.expectedLocation} → ${recommendedLoc})`,
+        status: 'Resolved',
+        outcome: 'FOUND',
+        foundQuantity: caseData.qty,
+      });
+      return;
+    }
+
     setCurrentStep('result-not-found');
-    const recommendedLoc = investigationResult?.evaluation.topCandidate?.location;
     stockTraceEngine.recordWorkerVerification({
       caseId: caseData.id,
-      outcome: 'NOT_FOUND',
-      verifiedLocation: recommendedLoc,
+      outcome,
+      verifiedLocation: outcome === 'NOT_FOUND' ? undefined : recommendedLoc,
+      actualQuantity: actualQty,
+      notes,
     });
 
-    const evidenceSummary =
-      activeScenario === 'conflict'
-        ? 'Conflicting information between scanner and camera'
-        : activeScenario === 'no-camera'
-        ? 'No useful camera footage available'
-        : `Item physically absent at recommended location ${recommendedLoc || 'B07'}`;
+    let evidenceSummary = '';
+    let discrepancyReason = '';
 
-    // OUTBOUND ACTION TRIGGER:
-    // When escalation is required (unresolved failed pick or conflict), trigger Gmail notification.
-    if (activeScenario === 'conflict') {
-      stockTraceNotifier
-        .notifyConflictingEvidence({
-          caseId: caseData.id,
-          sku: caseData.sku,
-          itemName: caseData.item,
-          expectedLocation: caseData.expectedLocation,
-          scannerEvidenceSummary: investigationResult?.evaluation.scannerEvidenceSummary || `Last recorded location: ${caseData.expectedLocation}`,
-          cameraEvidenceSummary: investigationResult?.evaluation.cameraEvidenceSummary || 'Movement observed toward C03',
-          status: 'Conflicting Evidence',
-          actionDirective: 'Physical verification required.',
-        })
-        .then((res) => setEmailNotificationResult(res))
-        .catch(() => {});
-    } else {
-      stockTraceNotifier
-        .notifyEscalationRequired({
-          caseId: caseData.id,
-          sku: caseData.sku,
-          itemName: caseData.item,
-          expectedLocation: caseData.expectedLocation,
-          recommendedLocation: recommendedLoc || undefined,
-          scannerEvidenceSummary: investigationResult?.evaluation.scannerEvidenceSummary,
-          cameraEvidenceSummary: investigationResult?.evaluation.cameraEvidenceSummary,
-          status: 'Verification Required',
-          actionDirective: recommendedLoc
-            ? `Please physically verify recommended location ${recommendedLoc}.`
-            : 'Please inspect warehouse bin and inventory records.',
-        })
-        .then((res) => setEmailNotificationResult(res))
-        .catch(() => {});
+    if (outcome === 'NOT_FOUND') {
+      evidenceSummary =
+        activeScenario === 'conflict'
+          ? 'Conflicting information between scanner and camera'
+          : activeScenario === 'no-camera'
+          ? 'No useful camera footage available'
+          : `Item physically absent at recommended location ${recommendedLoc || 'B07'}`;
+      discrepancyReason = `Item physically checked at ${recommendedLoc || 'recommended location'}; item absent.`;
+
+      // OUTBOUND ACTION TRIGGER:
+      if (activeScenario === 'conflict') {
+        stockTraceNotifier
+          .notifyConflictingEvidence({
+            caseId: caseData.id,
+            sku: caseData.sku,
+            itemName: caseData.item,
+            expectedLocation: caseData.expectedLocation,
+            scannerEvidenceSummary:
+              investigationResult?.evaluation.scannerEvidenceSummary ||
+              `Last recorded location: ${caseData.expectedLocation}`,
+            cameraEvidenceSummary:
+              investigationResult?.evaluation.cameraEvidenceSummary ||
+              'Movement observed toward C03',
+            status: 'Conflicting Evidence',
+            actionDirective: 'Physical verification required.',
+          })
+          .then((res) => setEmailNotificationResult(res))
+          .catch(() => {});
+      } else {
+        stockTraceNotifier
+          .notifyEscalationRequired({
+            caseId: caseData.id,
+            sku: caseData.sku,
+            itemName: caseData.item,
+            expectedLocation: caseData.expectedLocation,
+            recommendedLocation: recommendedLoc || undefined,
+            scannerEvidenceSummary: investigationResult?.evaluation.scannerEvidenceSummary,
+            cameraEvidenceSummary: investigationResult?.evaluation.cameraEvidenceSummary,
+            status: 'Verification Required',
+            actionDirective: recommendedLoc
+              ? `Please physically verify recommended location ${recommendedLoc}.`
+              : 'Please inspect warehouse bin and inventory records.',
+          })
+          .then((res) => setEmailNotificationResult(res))
+          .catch(() => {});
+      }
+    } else if (outcome === 'PARTIALLY_FOUND') {
+      const found = actualQty ?? 1;
+      evidenceSummary = `Partially found ${found} of ${caseData.qty} at ${recommendedLoc}`;
+      discrepancyReason = `Partial pick: ${found} of ${caseData.qty} located at ${recommendedLoc}. Missing balance: ${caseData.qty - found}.`;
+    } else if (outcome === 'WRONG_QUANTITY') {
+      const found = actualQty ?? 0;
+      evidenceSummary = `Quantity discrepancy: expected ${caseData.qty}, found ${found}`;
+      discrepancyReason = `Inventory count mismatch at ${recommendedLoc}: expected ${caseData.qty}, counted ${found}.`;
+    } else if (outcome === 'DAMAGED') {
+      evidenceSummary = `Damaged stock located at ${recommendedLoc}`;
+      discrepancyReason = `Damaged inventory reported at ${recommendedLoc}: ${notes || 'Packaging damaged / unpickable'}.`;
+    } else if (outcome === 'ESCALATE') {
+      evidenceSummary = `Floor picker escalated case ${caseData.id} directly to supervisor`;
+      discrepancyReason = `Manual escalation by floor associate: ${notes || 'Immediate supervisor review required'}.`;
     }
 
     onCompleteResolution({
       sku: caseData.sku,
       itemName: caseData.item,
       expectedLocation: caseData.expectedLocation,
-      verifiedLocation: '—',
+      verifiedLocation: outcome === 'NOT_FOUND' ? '—' : recommendedLoc,
       resolutionTime: '03:15',
       evidence: evidenceSummary,
       status: 'Escalated',
+      outcome,
+      foundQuantity: actualQty,
+      discrepancyReason,
     });
   };
 
-  const handleWrongQuantity = (actualQty: number = 0) => {
-    setCurrentStep('result-not-found');
-    const recommendedLoc = investigationResult?.evaluation.topCandidate?.location || 'B07';
-    stockTraceEngine.recordWorkerVerification({
-      caseId: caseData.id,
-      outcome: 'WRONG_QUANTITY',
-      verifiedLocation: recommendedLoc,
-      actualQuantity: actualQty,
-      notes: `Expected ${caseData.qty}, physically found ${actualQty}.`,
-    });
-
-    onCompleteResolution({
-      sku: caseData.sku,
-      itemName: caseData.item,
-      expectedLocation: caseData.expectedLocation,
-      verifiedLocation: 'Discrepancy Logged',
-      resolutionTime: '02:55',
-      evidence: `Quantity discrepancy: expected ${caseData.qty}, found ${actualQty}`,
-      status: 'Escalated',
-    });
-  };
+  const handleFound = () => handleVerifyOutcome('FOUND');
+  const handleNotFound = () => handleVerifyOutcome('NOT_FOUND');
+  const handleWrongQuantity = (actualQty: number = 0) => handleVerifyOutcome('WRONG_QUANTITY', actualQty);
 
   const openCameraPlayer = (footageIdOrEvent?: string | CameraFootageItem | (typeof currentCameraEvents)[0]) => {
     let item: CameraFootageItem | undefined;
@@ -519,7 +552,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                   </p>
                 </div>
 
-                {/* CAMERA EVIDENCE */}
+                {/* CAMERA EVIDENCE (CONSOLIDATED PER SPECIFICATION) */}
                 <div className="space-y-3 pt-2 border-t border-slate-100">
                   <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
                     CAMERA EVIDENCE
@@ -529,50 +562,61 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                       {investigationResult?.evaluation.cameraEvidenceSummary || 'No useful footage found.'}
                     </p>
                   ) : (
-                    <div className="space-y-3">
-                      {currentCameraEvents.map((evt, idx) => {
-                        const formattedDateTime = evt.date
-                          ? (evt.timeRange ? `${evt.date} · ${evt.timeRange}` : `${evt.date} · ${evt.exactTime}`)
-                          : (evt.timeRange || evt.exactTime);
+                    <div
+                      id="camera-evidence-consolidated-card"
+                      className="bg-slate-50 border border-slate-200/90 rounded-xl p-4 sm:p-5 space-y-4 shadow-2xs"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-sm sm:text-base font-bold text-slate-950">
+                          Possible movement from A12 toward B07
+                        </p>
+                        <div className="text-xs font-mono font-bold text-slate-600">
+                          16 Sep 2026 · 2:32 PM – 2:37 PM
+                        </div>
+                      </div>
 
-                        const cameraDisplayName = evt.camera
-                          .replace('AISLE-3-CAM', 'Aisle 3')
-                          .replace('A12-CAM', 'Bay A12')
-                          .replace('B07-CAM', 'Bay B07')
-                          .replace('-CAM', '');
-
-                        return (
-                          <div
-                            key={idx}
-                            id={`camera-evidence-event-${idx}`}
-                            className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5"
-                          >
-                            <p className="text-sm font-semibold text-slate-900">
-                              {evt.eventDescription || 'Movement observed from A12 toward B07'}
-                            </p>
-
-                            <div className="space-y-0.5">
-                              <div className="text-xs font-bold font-mono text-slate-900">
-                                {formattedDateTime}
-                              </div>
-                              <div className="text-xs text-slate-600">
-                                Camera: <span className="font-semibold text-slate-800">{cameraDisplayName}</span>
-                              </div>
-                            </div>
-
-                            <div className="pt-0.5">
-                              <button
-                                id={`btn-view-video-${idx}`}
-                                onClick={() => openCameraPlayer(evt)}
-                                className="py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl inline-flex items-center space-x-2 transition-colors cursor-pointer shadow-2xs"
-                              >
-                                <Play className="w-3.5 h-3.5 fill-current text-amber-400" />
-                                <span>▶ VIEW VIDEO</span>
-                              </button>
-                            </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200/80">
+                        <div className="space-y-1">
+                          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            Cameras:
                           </div>
-                        );
-                      })}
+                          <div className="text-xs font-semibold text-slate-800 flex items-center space-x-1.5 font-mono">
+                            <span>Bay A12</span>
+                            <span className="text-slate-400">&rarr;</span>
+                            <span>Aisle 3</span>
+                            <span className="text-slate-400">&rarr;</span>
+                            <span>Bay B07</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            Movement sequence:
+                          </div>
+                          <div className="text-xs font-bold text-slate-900 flex items-center space-x-1.5 font-mono">
+                            <span className="bg-slate-200/70 px-1.5 py-0.5 rounded text-slate-700">A12</span>
+                            <span className="text-slate-400">&rarr;</span>
+                            <span className="bg-slate-200/70 px-1.5 py-0.5 rounded text-slate-700">Aisle 3</span>
+                            <span className="text-slate-400">&rarr;</span>
+                            <span className="bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded">B07</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                        <button
+                          id="btn-view-video-consolidated"
+                          onClick={() => openCameraPlayer(cameraFootageList[0])}
+                          className="w-full sm:w-auto py-2.5 px-5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center space-x-2 transition-colors cursor-pointer shadow-xs active:scale-98"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current text-amber-400" />
+                          <span>VIEW VIDEO</span>
+                        </button>
+
+                        <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+                          3 sequential camera observations
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -597,12 +641,12 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                 </p>
               </div>
 
-              {/* Verification Buttons: [ FOUND ] and [ NOT FOUND ] */}
-              <div className="pt-2 border-t border-slate-200">
+              {/* Verification Action Bar (FOUND, NOT FOUND, PARTIALLY FOUND, WRONG QTY, DAMAGED, ESCALATE) */}
+              <div className="pt-2 border-t border-slate-200 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     id="btn-outcome-found"
-                    onClick={handleFound}
+                    onClick={() => handleVerifyOutcome('FOUND')}
                     className="py-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm rounded-xl flex items-center justify-center space-x-2 shadow-xs transition-colors cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
@@ -611,7 +655,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
 
                   <button
                     id="btn-outcome-not-found"
-                    onClick={handleNotFound}
+                    onClick={() => handleVerifyOutcome('NOT_FOUND')}
                     className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-colors cursor-pointer border border-slate-300"
                   >
                     <XCircle className="w-4 h-4 text-slate-500" />
@@ -619,14 +663,147 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                   </button>
                 </div>
 
-                {/* Report Wrong Quantity / Damage */}
-                <div className="mt-2.5 text-center">
+                {/* Inline Exception Drawers */}
+                {activeSubAction === 'PARTIALLY_FOUND' && (
+                  <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-xl space-y-2.5 animate-in fade-in">
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-900">
+                      <span>Enter Quantity Physically Located (Expected: {caseData.qty})</span>
+                      <button
+                        onClick={() => setActiveSubAction(null)}
+                        className="text-slate-400 hover:text-slate-700 text-xs font-semibold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={caseData.qty > 1 ? caseData.qty - 1 : 1}
+                        value={partialCount}
+                        onChange={(e) => setPartialCount(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20 px-3 py-1.5 text-sm font-bold font-mono bg-white border border-slate-300 rounded-lg text-slate-900"
+                      />
+                      <button
+                        id="btn-confirm-partial"
+                        onClick={() => handleVerifyOutcome('PARTIALLY_FOUND', partialCount)}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                      >
+                        Confirm Partial Pick
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeSubAction === 'WRONG_QUANTITY' && (
+                  <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-xl space-y-2.5 animate-in fade-in">
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-900">
+                      <span>Total Quantity Physically Observed (Expected: {caseData.qty})</span>
+                      <button
+                        onClick={() => setActiveSubAction(null)}
+                        className="text-slate-400 hover:text-slate-700 text-xs font-semibold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={999}
+                        value={wrongCount}
+                        onChange={(e) => setWrongCount(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-20 px-3 py-1.5 text-sm font-bold font-mono bg-white border border-slate-300 rounded-lg text-slate-900"
+                      />
+                      <button
+                        id="btn-confirm-wrong-qty"
+                        onClick={() => handleVerifyOutcome('WRONG_QUANTITY', wrongCount)}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                      >
+                        Log Count Discrepancy
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeSubAction === 'DAMAGED' && (
+                  <div className="p-3.5 bg-rose-50/90 border border-rose-200 rounded-xl space-y-2.5 animate-in fade-in">
+                    <div className="flex items-center justify-between text-xs font-bold text-rose-900">
+                      <span>Report Damaged Inventory</span>
+                      <button
+                        onClick={() => setActiveSubAction(null)}
+                        className="text-slate-400 hover:text-slate-700 text-xs font-semibold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={damageNotes}
+                      onChange={(e) => setDamageNotes(e.target.value)}
+                      placeholder="Brief note on item condition..."
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900"
+                    />
+                    <button
+                      id="btn-confirm-damaged"
+                      onClick={() => handleVerifyOutcome('DAMAGED', 0, damageNotes)}
+                      className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                    >
+                      Record Damaged Stock & Escalate
+                    </button>
+                  </div>
+                )}
+
+                {/* Exception Options Toolbar */}
+                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
                   <button
-                    id="btn-report-wrong-qty"
-                    onClick={() => handleWrongQuantity(0)}
-                    className="text-[11px] font-semibold text-slate-500 hover:text-rose-700 transition-colors cursor-pointer underline decoration-dotted"
+                    id="btn-toggle-partial"
+                    onClick={() =>
+                      setActiveSubAction((prev) => (prev === 'PARTIALLY_FOUND' ? null : 'PARTIALLY_FOUND'))
+                    }
+                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors cursor-pointer border ${
+                      activeSubAction === 'PARTIALLY_FOUND'
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                    }`}
                   >
-                    Report wrong quantity or damaged
+                    Partially Found
+                  </button>
+
+                  <button
+                    id="btn-toggle-wrong-qty"
+                    onClick={() =>
+                      setActiveSubAction((prev) => (prev === 'WRONG_QUANTITY' ? null : 'WRONG_QUANTITY'))
+                    }
+                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors cursor-pointer border ${
+                      activeSubAction === 'WRONG_QUANTITY'
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    Wrong Quantity
+                  </button>
+
+                  <button
+                    id="btn-toggle-damaged"
+                    onClick={() =>
+                      setActiveSubAction((prev) => (prev === 'DAMAGED' ? null : 'DAMAGED'))
+                    }
+                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors cursor-pointer border ${
+                      activeSubAction === 'DAMAGED'
+                        ? 'bg-rose-100 text-rose-900 border-rose-300'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    Damaged
+                  </button>
+
+                  <button
+                    id="btn-direct-escalate"
+                    onClick={() => handleVerifyOutcome('ESCALATE', 0, 'Floor picker manual escalation')}
+                    className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer"
+                  >
+                    Escalate
                   </button>
                 </div>
               </div>
@@ -885,33 +1062,68 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* SCREEN 4B: ESCALATED (REVIEW / NOT FOUND)                                 */}
+      {/* SCREEN 4B: ESCALATED / DISCREPANCY / NOT FOUND                            */}
       {/* ========================================================================= */}
       {currentStep === 'result-not-found' && (
         <div className="bg-white border border-slate-300 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
-              <AlertTriangle className="w-7 h-7 text-rose-600" />
+            <div
+              className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                lastOutcome === 'PARTIALLY_FOUND' ||
+                lastOutcome === 'WRONG_QUANTITY' ||
+                lastOutcome === 'DAMAGED'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-rose-100 text-rose-700'
+              }`}
+            >
+              <AlertTriangle className="w-7 h-7" />
             </div>
             <div>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {activeScenario === 'conflict' || activeScenario === 'no-camera'
+                {lastOutcome === 'PARTIALLY_FOUND'
+                  ? 'PARTIAL PICK RECORDED'
+                  : lastOutcome === 'WRONG_QUANTITY'
+                  ? 'COUNT DISCREPANCY RECORDED'
+                  : lastOutcome === 'DAMAGED'
+                  ? 'DAMAGED INVENTORY LOGGED'
+                  : lastOutcome === 'ESCALATE'
+                  ? 'ESCALATED TO SUPERVISOR'
+                  : activeScenario === 'conflict' || activeScenario === 'no-camera'
                   ? 'CASE SENT FOR REVIEW'
                   : 'ITEM STILL NOT FOUND'}
               </h2>
+              <p className="text-xs sm:text-sm font-semibold text-slate-600 mt-0.5">
+                {lastOutcome === 'PARTIALLY_FOUND'
+                  ? `Located ${partialCount} of ${caseData.qty} units at recommended location.`
+                  : lastOutcome === 'WRONG_QUANTITY'
+                  ? `Physical count was ${wrongCount} units (expected ${caseData.qty}).`
+                  : lastOutcome === 'DAMAGED'
+                  ? 'Item recorded as damaged and unusable.'
+                  : lastOutcome === 'ESCALATE'
+                  ? 'Manual escalation requested for warehouse supervisor review.'
+                  : 'Item physically absent at recommended location.'}
+              </p>
             </div>
           </div>
 
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1 text-xs text-slate-700">
             <p className="font-semibold text-slate-900">
-              {activeScenario === 'conflict'
+              {lastOutcome === 'PARTIALLY_FOUND' ||
+              lastOutcome === 'WRONG_QUANTITY' ||
+              lastOutcome === 'DAMAGED'
+                ? 'An operational discrepancy has been logged and flagged for supervisor review.'
+                : activeScenario === 'conflict'
                 ? 'Conflicting information was detected between warehouse systems.'
                 : activeScenario === 'no-camera'
                 ? "We couldn't identify another reliable location from camera footage."
                 : "We couldn't identify another reliable location."}
             </p>
             <p className="text-slate-600">
-              Case sent for warehouse review.
+              {lastOutcome === 'PARTIALLY_FOUND' ||
+              lastOutcome === 'WRONG_QUANTITY' ||
+              lastOutcome === 'DAMAGED'
+                ? 'Inventory records flagged for recount and bin audit.'
+                : 'Case sent for warehouse review.'}
             </p>
 
             {/* Clean Outbound Email Dispatch Status */}

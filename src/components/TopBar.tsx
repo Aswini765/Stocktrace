@@ -1,11 +1,12 @@
 import React from 'react';
-import { Building2, Wifi, User, Menu } from 'lucide-react';
+import { Building2, Wifi, User, Menu, BookOpen } from 'lucide-react';
 
 interface TopBarProps {
   onOpenMobileMenu?: () => void;
+  onOpenSopModal?: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu, onOpenSopModal }) => {
   return (
     <header
       id="main-topbar"
@@ -44,11 +45,25 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
         </div>
       </div>
 
-      {/* Right / User */}
-      <div className="flex items-center space-x-1.5 text-xs text-slate-600 shrink-0">
-        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        <span className="text-slate-400 font-medium hidden sm:inline">User:</span>
-        <span className="font-semibold text-slate-900">Warehouse Supervisor</span>
+      {/* Right / SOP Guidance & User */}
+      <div className="flex items-center space-x-3 shrink-0">
+        {onOpenSopModal && (
+          <button
+            id="btn-open-sop-guidance"
+            onClick={onOpenSopModal}
+            className="flex items-center space-x-1.5 text-xs font-semibold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer"
+            title="Warehouse Standard Operating Procedures (SOP)"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-amber-600" />
+            <span className="hidden sm:inline">SOP Guidance</span>
+          </button>
+        )}
+
+        <div className="flex items-center space-x-1.5 text-xs text-slate-600 shrink-0">
+          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span className="text-slate-400 font-medium hidden sm:inline">User:</span>
+          <span className="font-semibold text-slate-900">Warehouse Supervisor</span>
+        </div>
       </div>
     </header>
   );
