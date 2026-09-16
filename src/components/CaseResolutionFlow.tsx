@@ -11,7 +11,12 @@ import {
 } from 'lucide-react';
 import { FailedPickCase, ScenarioType, WorkerVerificationOutcome } from '../types';
 import { CameraVideoPlayerModal, CameraFootageItem } from './CameraVideoPlayerModal';
-import { stockTraceEngine, InvestigationExecutionResult } from '../harness/case_engine';
+import {
+  stockTraceEngine,
+  runInvestigation,
+  verifyCase,
+  InvestigationExecutionResult,
+} from '../harness';
 import { SCANNER_TRANSACTIONS, CAMERA_EVENTS } from '../data/mockData';
 import { stockTraceNotifier, SendEmailResult } from '../services/email';
 
@@ -90,7 +95,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
     }
 
     try {
-      const res = stockTraceEngine.runInvestigation(caseData.id, scannerData, cameraData, {
+      const res = runInvestigation(caseData.id, scannerData, cameraData, {
         forceScenario: (activeScenario === 'conflict' || activeScenario === 'no-camera') ? activeScenario : undefined,
         isStale,
         referenceNow: '14:40',
@@ -203,11 +208,12 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
 
     if (outcome === 'FOUND') {
       setCurrentStep('result-found');
-      stockTraceEngine.recordWorkerVerification({
+      verifyCase({
         caseId: caseData.id,
         outcome: 'FOUND',
         verifiedLocation: recommendedLoc,
         actualQuantity: caseData.qty,
+        role: 'OPERATOR',
       });
 
       onCompleteResolution({
@@ -225,12 +231,13 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
     }
 
     setCurrentStep('result-not-found');
-    stockTraceEngine.recordWorkerVerification({
+    verifyCase({
       caseId: caseData.id,
       outcome,
       verifiedLocation: outcome === 'NOT_FOUND' ? undefined : recommendedLoc,
       actualQuantity: actualQty,
       notes,
+      role: 'OPERATOR',
     });
 
     let evidenceSummary = '';

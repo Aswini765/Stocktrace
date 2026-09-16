@@ -23,11 +23,15 @@ import { normalizeEvidenceCollection, RawScannerInput, RawCameraInput } from './
 import { fuseEvidence, FusedEvidenceReport } from './evidence_fusion';
 import { evaluateCandidates, CandidateEvaluationResult } from './candidate_engine';
 import { applyGuardrails, processVerificationOutcome } from './guardrails';
+import { generateGroundedExplanation, GroundedExplanationResult } from './explanation_engine';
+
+export type UserRole = 'OPERATOR' | 'SUPERVISOR' | 'SYSTEM';
 
 export interface InvestigationExecutionResult {
   caseModel: HarnessCaseModel;
   evaluation: CandidateEvaluationResult;
   fusedReport: FusedEvidenceReport;
+  explanation: GroundedExplanationResult;
 }
 
 export class StockTraceCaseEngine {
@@ -165,10 +169,17 @@ export class StockTraceCaseEngine {
       });
     }
 
+    // Step G: Generate Grounded Operator Explanation
+    const explanation = generateGroundedExplanation({
+      fusedReport,
+      evaluation,
+    });
+
     return {
       caseModel: c,
       evaluation,
       fusedReport,
+      explanation,
     };
   }
 
@@ -181,6 +192,7 @@ export class StockTraceCaseEngine {
     verifiedLocation?: string;
     actualQuantity?: number;
     notes?: string;
+    role?: UserRole;
   }): {
     caseModel: HarnessCaseModel;
     discrepancy?: DiscrepancyRecord;
