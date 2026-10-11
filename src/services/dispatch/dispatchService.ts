@@ -33,6 +33,18 @@ export const WAREHOUSE_DISPATCH_ORDERS: DispatchOrder[] = [
     locationDescription: 'Near the blue rack, bottom shelf (Level 1)',
     destinationTote: 'TOTE-44',
     itemValue: 1850,
+    scenarioId: 'scenario-1',
+    landmarkHint: 'Near the blue rack, bottom shelf (Level 1)',
+  },
+  {
+    orderId: 'ORD-88201',
+    sku: 'SKU-1042',
+    itemName: 'Wireless Adapter Dual-Band',
+    requiredQuantity: 5,
+    expectedBin: 'A12',
+    locationDescription: 'Near the blue rack, bottom shelf (Level 1)',
+    destinationTote: 'TOTE-44',
+    itemValue: 1850,
     scenarioId: 'scenario-2',
     landmarkHint: 'Near the blue rack, bottom shelf (Level 1)',
   },
@@ -116,6 +128,13 @@ export const WAREHOUSE_DISPATCH_ORDERS: DispatchOrder[] = [
 const taskCacheByOrder = new Map<string, string>();
 
 /**
+ * Clears the cached task IDs, used during scenario resets.
+ */
+export function clearTaskCache(): void {
+  taskCacheByOrder.clear();
+}
+
+/**
  * Generates or retrieves an existing unique investigation task ID.
  */
 export function getOrCreateInvestigationTaskId(orderId: string): string {
@@ -192,7 +211,38 @@ export function matchDispatchOrder(
     }
   }
 
-  // 2. Direct Expected Bin match
+  // 2. If activeScenarioId is provided, check if it matches the current scenario's bin or general context
+  if (activeScenarioId) {
+    const scenarioOrder = WAREHOUSE_DISPATCH_ORDERS.find((o) => o.scenarioId === activeScenarioId);
+    if (scenarioOrder) {
+      // If message matches the scenario's expected bin or is general inquiry
+      const binRegex = new RegExp(`\\b${scenarioOrder.expectedBin.toLowerCase()}\\b`, 'i');
+      const isGenericReport =
+        lower.includes('missing') ||
+        lower.includes('cannot find') ||
+        lower.includes("can't find") ||
+        lower.includes('not found') ||
+        lower.includes('empty') ||
+        lower.includes('damage') ||
+        lower.includes('broken') ||
+        lower.includes('only') ||
+        lower.includes('shortage');
+
+      if (binRegex.test(lower) || isGenericReport) {
+        const qtyInfo = extractReportedQuantity(message, scenarioOrder.requiredQuantity);
+        return {
+          order: scenarioOrder,
+          confidence: 'HIGH',
+          matchedReason: `Correlated via active scenario (${activeScenarioId})`,
+          reportedQuantity: qtyInfo.reportedQty,
+          quantityDiscrepancy: qtyInfo.discrepancy,
+          isDamagedReported: lower.includes('damage') || lower.includes('broken') || lower.includes('cracked'),
+        };
+      }
+    }
+  }
+
+  // 3. Direct Expected Bin match across all orders
   for (const order of WAREHOUSE_DISPATCH_ORDERS) {
     // Word boundary check for bin e.g. "A12", "B07"
     const binRegex = new RegExp(`\\b${order.expectedBin.toLowerCase()}\\b`, 'i');
@@ -209,7 +259,7 @@ export function matchDispatchOrder(
     }
   }
 
-  // 3. Product Name / Keywords match
+  // 4. Product Name / Keywords match
   const keywordMap: Array<{ keywords: string[]; orderId: string }> = [
     { keywords: ['wireless', 'adapter', 'dual-band'], orderId: 'ORD-88201' },
     { keywords: ['usb', 'hub', 'powered 7-port', '7-port'], orderId: 'ORD-88204' },
@@ -235,7 +285,7 @@ export function matchDispatchOrder(
     }
   }
 
-  // 4. Fallback to active demo scenario if available
+  // 5. Fallback to active demo scenario if available
   if (activeScenarioId) {
     const orderForScenario =
       WAREHOUSE_DISPATCH_ORDERS.find((o) => o.scenarioId === activeScenarioId) ||

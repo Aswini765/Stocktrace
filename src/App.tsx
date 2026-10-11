@@ -96,8 +96,10 @@ export default function App() {
           : c
       )
     );
-    setActiveCaseId(null);
-    setCurrentTab('open-cases');
+    if (currentRole !== 'picker') {
+      setActiveCaseId(null);
+      setCurrentTab('open-cases');
+    }
   };
 
   const handleRequestRecheck = (caseId: string) => {
@@ -128,6 +130,7 @@ export default function App() {
 
   // Shared Resolution Handler
   const handleCompleteResolution = (details: {
+    caseId?: string;
     sku: string;
     itemName: string;
     expectedLocation: string;
@@ -214,7 +217,7 @@ export default function App() {
     // Update case in state
     setCases((prev) =>
       prev.map((c) =>
-        c.sku === details.sku
+        (details.caseId ? c.id === details.caseId : false) || c.sku === details.sku
           ? {
               ...c,
               status: details.status === 'Resolved' ? 'RESOLVED' : 'ESCALATED',
@@ -262,6 +265,7 @@ export default function App() {
     notes?: string;
   }) => {
     handleCompleteResolution({
+      caseId: details.caseId,
       sku: details.sku,
       itemName: details.itemName,
       expectedLocation: details.expectedLocation,

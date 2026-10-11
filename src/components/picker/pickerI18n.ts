@@ -397,6 +397,12 @@ export const PICKER_I18N = {
       kn: 'ದಯವಿಟ್ಟು ಸೂಚಿಸಲಾದ ಬಿನ್ ಪರಿಶೀಲಿಸಿ. ನಿಮಗೆ ವಸ್ತು ಸಿಕ್ಕಿತೇ?',
     },
 
+    recommendationFoundExpected: (bin: string): LocalizedString => ({
+      en: `Inventory and dispatch records confirm this item is assigned to expected bin ${bin}. Please check bin ${bin} carefully.`,
+      hi: `इन्वेंटरी और डिस्पैच रिकॉर्ड पुष्टि करते हैं कि यह सामान अपेक्षित बिन ${bin} पर है। कृपया बिन ${bin} की अच्छी तरह से जांच करें।`,
+      kn: `ದಾಸ್ತಾನು ಮತ್ತು ರವಾನೆ ದಾಖಲೆಗಳು ಈ ವಸ್ತು ನಿರೀಕ್ಷಿತ ಬಿನ್ ${bin} ನಲ್ಲಿದೆ ಎಂದು ದೃಢೀಕರಿಸುತ್ತವೆ. ದಯವಿಟ್ಟು ಬಿನ್ ${bin} ಅನ್ನು ಎಚ್ಚರಿಕೆಯಿಂದ ಪರಿಶೀಲಿಸಿ.`,
+    }),
+
     recommendationInsufficient: {
       en: "I couldn't find enough reliable evidence to recommend another location. I'll send this case to your supervisor for help.",
       hi: 'मुझे किसी अन्य स्थान की सिफारिश करने के लिए पर्याप्त विश्वसनीय सबूत नहीं मिले। मैं मदद के लिए यह केस आपके सुपरवाइजर को भेजूंगा।',

@@ -32,6 +32,7 @@ import {
   matchDispatchOrder,
   getOrCreateInvestigationTaskId,
   extractReportedQuantity,
+  clearTaskCache,
 } from '../../services/dispatch/dispatchService';
 import { investigationOrchestrator } from '../../orchestrator/investigationOrchestrator';
 import { traceLogger } from '../../services/observability/traceLogger';
@@ -64,6 +65,7 @@ interface ConversationMessage {
     | 'PICKER_REPORT'
     | 'ORDER_MATCHED_CONFIRMATION'
     | 'TASK_ASSIGNED_PROGRESS'
+    | 'REC_FOUND_EXPECTED'
     | 'REC_SUPPORTED'
     | 'REC_INSUFFICIENT'
     | 'REC_CONFLICTING'
@@ -178,6 +180,12 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
 
   // Chat scroll anchor
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const timeoutIdsRef = useRef<NodeJS.Timeout[]>([]);
+
+  const clearAllTimeouts = () => {
+    timeoutIdsRef.current.forEach((t) => clearTimeout(t));
+    timeoutIdsRef.current = [];
+  };
 
   const getCurrentTime = () =>
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -189,10 +197,15 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
       setSpeechRecognitionSupported(Boolean(SpeechRecognitionClass));
     }
+    return () => {
+      clearAllTimeouts();
+    };
   }, []);
 
   // Initialize or reset scenario state
   const initScenario = (scenario: DemoScenario) => {
+    clearAllTimeouts();
+    clearTaskCache();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -218,6 +231,8 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
   };
 
   const handleSelectScenario = (scenarioId: string) => {
+    clearAllTimeouts();
+    clearTaskCache();
     setSelectedScenarioId(scenarioId);
     const target = DEMO_SCENARIOS.find((s) => s.id === scenarioId) || DEMO_SCENARIOS[0];
     onSelectCase(target.caseId);
@@ -225,6 +240,8 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
   };
 
   const handleResetCurrentDemo = () => {
+    clearAllTimeouts();
+    clearTaskCache();
     initScenario(currentScenario);
     onResetCase(currentScenario.caseId);
   };
@@ -368,8 +385,13 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
   // CORE WORKFLOW: PICKER REPORTS PROBLEM -> IDENTIFY DISPATCH -> ASSIGN TASK -> GATHER EVIDENCE -> RESPOND
   // =========================================================================
   const handleSubmitReport = (textToSend?: string) => {
-    const rawReport = (textToSend || reportInputText).trim();
-    if (!rawReport) return;
+    clearAllTimeouts();
+    const fallbackText =
+      currentScenario.defaultReportPrompt?.[selectedLang] ||
+      currentScenario.defaultReportPrompt?.en ||
+      `Cannot find item at expected bin ${currentScenario.expectedLocation}`;
+
+    const rawReport = (textToSend !== undefined && textToSend.trim() !== '' ? textToSend : reportInputText).trim() || fallbackText;
 
     // Stop active speech recognition if running
     if (isRecordingSpeech && recognitionRef.current) {
@@ -420,7 +442,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
     setAssignedTask(taskData);
 
     // 3. Display StockTrace Confirmation & Task Assignment Details
-    setTimeout(() => {
+    const t1 = setTimeout(() => {
       const orderConfirmationMsg: ConversationMessage = {
         id: `msg-sys-matched-${Date.now()}`,
         sender: 'system',
@@ -450,7 +472,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
       setMessages((prev) => [...prev, orderConfirmationMsg, progressMsg]);
 
       // 4. Gather Evidence & Run StockTrace Evidence Engine
-      setTimeout(() => {
+      const t2 = setTimeout(() => {
         try {
           // Pass sample inventory, scanner, and camera data to evidence engine
           const investigationRes = executeScenarioInvestigation(currentScenario);
@@ -462,29 +484,21 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
           // Inspect Scenario Outcome
           const outcomeType = currentScenario.expectedOutcomeType;
 
-          if (outcomeType === 'FOUND_EXPECTED' || rawReport.toLowerCase().includes('found at assigned') || rawReport.toLowerCase().includes('found at bin')) {
-            // Scenario 1: Picker verified item found at expected bin
-            const resMsg: ConversationMessage = {
-              id: `msg-sys-res-${Date.now()}`,
+          if (outcomeType === 'FOUND_EXPECTED') {
+            // Scenario 1: Evidence supports original expected location (A12)
+            const recExpectedMsg: ConversationMessage = {
+              id: `msg-sys-rec-exp-${Date.now()}`,
               sender: 'system',
               timestamp: getCurrentTime(),
-              type: 'RESOLVED_SUMMARY',
+              type: 'REC_FOUND_EXPECTED',
               payload: { bin: matchedOrder.expectedBin },
             };
-            setMessages((prev) => [...prev, resMsg]);
-            setStage('resolved');
-            setActiveSpeechText(PICKER_I18N.messages.caseResolvedMessage(matchedOrder.expectedBin)[selectedLang]);
-
-            onPickerVerification({
-              caseId: currentScenario.caseId,
-              sku: matchedOrder.sku,
-              itemName: matchedOrder.itemName,
-              expectedLocation: matchedOrder.expectedBin,
-              verifiedLocation: matchedOrder.expectedBin,
-              outcome: 'FOUND',
-              foundQuantity: matchedOrder.requiredQuantity,
-              notes: `Physically verified and found at expected bin ${matchedOrder.expectedBin}. Pick completed.`,
-            });
+            setMessages((prev) => [...prev, recExpectedMsg]);
+            setRecommendedBin(matchedOrder.expectedBin);
+            setStage('recommendation_active');
+            setActiveSpeechText(
+              PICKER_I18N.messages.recommendationFoundExpected(matchedOrder.expectedBin)[selectedLang]
+            );
           } else if (outcomeType === 'LESS_QUANTITY' || matchResult.reportedQuantity !== undefined) {
             // Scenario 6: Less Quantity Discrepancy (e.g. 6 of 10)
             const reportedFound = matchResult.reportedQuantity ?? (currentScenario.qty > 1 ? Math.floor(currentScenario.qty * 0.6) : 1);
@@ -622,8 +636,10 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
         } catch {
           setStage('welcome');
         }
-      }, 700);
-    }, 450);
+      }, 650);
+      timeoutIdsRef.current.push(t2);
+    }, 350);
+    timeoutIdsRef.current.push(t1);
   };
 
   // Run Simulated Tier 3 AI Video Analysis for High-Value item
@@ -658,7 +674,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
 
   // Verification Action 1: Found Here
   const handleFoundHere = () => {
-    const loc = recommendedBin || 'B07';
+    const loc = recommendedBin || assignedTask?.expectedBin || currentScenario.expectedLocation;
     const order = assignedTask;
 
     const pickerMsg: ConversationMessage = {
@@ -697,7 +713,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
 
   // Verification Action 2: Still Not Found
   const handleStillNotFound = () => {
-    const loc = recommendedBin || 'B07';
+    const loc = recommendedBin || assignedTask?.expectedBin || currentScenario.expectedLocation;
     const order = assignedTask;
 
     const pickerMsg: ConversationMessage = {
@@ -855,6 +871,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
   // Render message text helper
   const renderMessageText = (msg: ConversationMessage, lang: PickerLang): string => {
     const p = msg.payload;
+    const defaultLoc = recommendedBin || assignedTask?.expectedBin || currentScenario.expectedLocation;
     switch (msg.type) {
       case 'PICKER_REPORT':
         return p?.customText || '';
@@ -862,6 +879,10 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
         return PICKER_I18N.dispatch.orderMatchedConfirmation[lang];
       case 'TASK_ASSIGNED_PROGRESS':
         return PICKER_I18N.dispatch.taskAssignedProgress[lang];
+      case 'REC_FOUND_EXPECTED':
+        return PICKER_I18N.messages.recommendationFoundExpected(
+          p?.bin || assignedTask?.expectedBin || currentScenario.expectedLocation
+        )[lang];
       case 'REC_SUPPORTED':
         return PICKER_I18N.messages.recommendationSupported(
           p?.fromBin || assignedTask?.expectedBin || 'the expected bin',
@@ -889,15 +910,15 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
       case 'TIER3_COMPLETED':
         return PICKER_I18N.messages.tier3AnalysisCompleted(p?.toBin || 'E14')[lang];
       case 'PICKER_FOUND':
-        return PICKER_I18N.messages.pickerFound(p?.bin || 'B07')[lang];
+        return PICKER_I18N.messages.pickerFound(p?.bin || defaultLoc)[lang];
       case 'PICKER_NOT_FOUND_RECOMMENDED':
-        return PICKER_I18N.messages.pickerNotFoundRecommended(p?.bin || 'B07')[lang];
+        return PICKER_I18N.messages.pickerNotFoundRecommended(p?.bin || defaultLoc)[lang];
       case 'PICKER_LESS_QTY':
         return PICKER_I18N.messages.pickerReportedLessQty(p?.foundQty || 1, p?.totalQty || 10)[lang];
       case 'PICKER_DAMAGED':
         return PICKER_I18N.messages.pickerReportedDamaged(p?.damageReason || 'Cracked packaging')[lang];
       case 'RESOLVED_SUMMARY':
-        return PICKER_I18N.messages.caseResolvedMessage(p?.bin || 'B07')[lang];
+        return PICKER_I18N.messages.caseResolvedMessage(p?.bin || defaultLoc)[lang];
       case 'ESCALATED_SUMMARY':
         return PICKER_I18N.messages.caseEscalatedMessage(p?.reason || 'Under supervisor review')[lang];
       default:
@@ -1072,34 +1093,37 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
               </p>
             </div>
 
-            {/* Prominent Microphone Button: Report a Missing Item */}
-            <div className="space-y-1.5 flex flex-col items-center">
-              <button
-                id="picker-btn-report-missing"
-                onClick={handleToggleSpeechRecognition}
-                className={`w-full min-h-[56px] rounded-xl text-sm font-bold flex items-center justify-center space-x-2.5 shadow-md cursor-pointer transition-all active:scale-[0.99] ${
-                  isRecordingSpeech
-                    ? 'bg-rose-700 text-white ring-4 ring-rose-200 animate-pulse'
-                    : 'bg-rose-600 hover:bg-rose-700 text-white'
-                }`}
-              >
-                {isRecordingSpeech ? (
-                  <>
-                    <Mic className="w-5 h-5 text-white animate-bounce" />
-                    <span>{PICKER_I18N.voiceModal.listeningNow[selectedLang]}</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-5 h-5 text-rose-100" />
-                    <span>{PICKER_I18N.welcome.reportMissingBtn[selectedLang]}</span>
-                  </>
-                )}
-              </button>
+            {/* Prominent Action: Report a Missing Item */}
+            <div className="space-y-2 flex flex-col items-center">
+              <div className="w-full flex items-center space-x-2">
+                <button
+                  id="picker-btn-report-missing"
+                  onClick={() => handleSubmitReport(reportInputText)}
+                  className="flex-1 min-h-[52px] rounded-xl text-sm font-bold flex items-center justify-center space-x-2.5 shadow-md cursor-pointer transition-all active:scale-[0.99] bg-rose-600 hover:bg-rose-700 text-white"
+                >
+                  <AlertCircle className="w-5 h-5 text-rose-100" />
+                  <span>{PICKER_I18N.welcome.reportMissingBtn[selectedLang]}</span>
+                </button>
+
+                <button
+                  id="picker-btn-voice-toggle"
+                  onClick={handleToggleSpeechRecognition}
+                  aria-label="Toggle voice input"
+                  className={`h-[52px] px-3.5 rounded-xl border flex items-center justify-center cursor-pointer transition-colors ${
+                    isRecordingSpeech
+                      ? 'bg-rose-700 text-white border-rose-800 ring-2 ring-rose-300 animate-pulse'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-2xs'
+                  }`}
+                  title={isRecordingSpeech ? 'Stop microphone' : 'Speak report with microphone'}
+                >
+                  <Mic className={`w-5 h-5 ${isRecordingSpeech ? 'text-white animate-bounce' : 'text-slate-600'}`} />
+                </button>
+              </div>
 
               <span className="text-[11px] text-slate-500 font-medium">
                 {isRecordingSpeech
                   ? 'Listening to microphone... Speak clearly'
-                  : 'Tap to speak via microphone, or type your report below'}
+                  : 'Click "Report Missing Item" or use mic/text below'}
               </span>
 
               {speechError && (
@@ -1143,6 +1167,27 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
                 {PICKER_I18N.welcome.quickExamplesLabel[selectedLang]}
               </span>
               <div className="flex flex-col gap-1.5">
+                {/* Active scenario default prompt chip */}
+                {currentScenario.defaultReportPrompt && (
+                  <button
+                    id="picker-quick-scenario-prompt"
+                    onClick={() => {
+                      const prompt =
+                        currentScenario.defaultReportPrompt?.[selectedLang] ||
+                        currentScenario.defaultReportPrompt?.en ||
+                        `Cannot find item at expected bin ${currentScenario.expectedLocation}`;
+                      setReportInputText(prompt);
+                      handleSubmitReport(prompt);
+                    }}
+                    className="text-[11px] text-emerald-950 bg-emerald-50/80 hover:bg-emerald-100/90 active:bg-emerald-200/80 border border-emerald-200 rounded-lg p-2 text-left transition-colors cursor-pointer flex items-center justify-between font-medium group"
+                  >
+                    <span>
+                      {currentScenario.defaultReportPrompt?.[selectedLang] ||
+                        currentScenario.defaultReportPrompt?.en}
+                    </span>
+                    <Send className="w-3 h-3 text-emerald-600 group-hover:text-emerald-900 shrink-0 ml-2" />
+                  </button>
+                )}
                 {PICKER_I18N.welcome.examples.map((ex) => (
                   <button
                     key={ex.id}
@@ -1249,6 +1294,39 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
                                 Reported Available: <strong>{msg.payload.reportedQty}</strong> &bull; Calculated Shortage: <strong>{msg.payload.discrepancy} units</strong>
                               </div>
                             )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Evidence Card: Found at Expected Bin (Scenario 1) */}
+                      {msg.type === 'REC_FOUND_EXPECTED' && msg.payload && (
+                        <div
+                          id="recommendation-card-expected"
+                          className="mt-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-1.5 font-mono font-black text-emerald-900 text-sm">
+                              <MapPin className="w-4 h-4 text-emerald-700 shrink-0" />
+                              <span>Expected Bin: {msg.payload.bin || assignedTask?.expectedBin || 'A12'}</span>
+                            </div>
+                            <span className="text-[10px] font-bold bg-emerald-200/60 text-emerald-900 px-2 py-0.5 rounded-full">
+                              Put-Away Confirmed
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] text-emerald-900 font-medium">
+                            {assignedTask?.locationDescription || 'Assigned primary bay slot'}
+                          </div>
+
+                          <div className="pt-1.5 border-t border-emerald-200/60 space-y-1 text-[10px] text-emerald-800">
+                            <div className="flex justify-between">
+                              <span className="font-semibold">Put-Away Scan:</span>
+                              <span>Matched primary bin &bull; No outbound transfer</span>
+                            </div>
+                            <div className="flex justify-between font-semibold text-emerald-950">
+                              <span>Action Required:</span>
+                              <span>Physically check expected bin and confirm</span>
+                            </div>
                           </div>
                         </div>
                       )}

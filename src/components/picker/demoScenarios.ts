@@ -34,6 +34,11 @@ export interface DemoScenario {
     | 'LESS_QUANTITY'
     | 'DAMAGED'
     | 'HIGH_VALUE_TIER3';
+  defaultReportPrompt?: {
+    en: string;
+    hi: string;
+    kn: string;
+  };
 }
 
 export const DEMO_SCENARIOS: DemoScenario[] = [
@@ -56,6 +61,11 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     scannerRecords: [],
     cameraRecords: [],
     expectedOutcomeType: 'FOUND_EXPECTED',
+    defaultReportPrompt: {
+      en: 'I cannot find the Wireless Adapter at expected bin A12.',
+      hi: 'मुझे अपेक्षित बिन A12 में वायरलेस अडैप्टर नहीं मिल रहा है।',
+      kn: 'ನನಗೆ ನಿರೀಕ್ಷಿತ ಬಿನ್ A12 ನಲ್ಲಿ ವೈರ್ಲೆಸ್ ಅಡಾಪ್ಟರ್ ಸಿಗುತ್ತಿಲ್ಲ.',
+    },
   },
   {
     id: 'scenario-2',
@@ -95,6 +105,11 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       referenceNow: '14:40',
     },
     expectedOutcomeType: 'RECOMMEND_B07',
+    defaultReportPrompt: {
+      en: 'I cannot find the Wireless Adapter at expected bin A12.',
+      hi: 'मुझे अपेक्षित बिन A12 में वायरलेस अडैप्टर नहीं मिल रहा है।',
+      kn: 'ನನಗೆ ನಿರೀಕ್ಷಿತ ಬಿನ್ A12 ನಲ್ಲಿ ವೈರ್ಲೆಸ್ ಅಡಾಪ್ಟರ್ ಸಿಗುತ್ತಿಲ್ಲ.',
+    },
   },
   {
     id: 'scenario-3',
@@ -118,6 +133,11 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       referenceNow: '13:20',
     },
     expectedOutcomeType: 'INSUFFICIENT',
+    defaultReportPrompt: {
+      en: 'The item Powered 7-Port USB Hub is missing at bin B07.',
+      hi: 'पावर्ड 7-पोर्ट यूएसबी हब बिन B07 में नहीं मिल रहा है।',
+      kn: 'ಪವರ್ಡ್ 7-ಪೋರ್ಟ್ ಯುಎಸ್‌ಬಿ ಹಬ್ ಬಿನ್ B07 ನಲ್ಲಿ ಕಾಣೆಯಾಗಿದೆ.',
+    },
   },
   {
     id: 'scenario-4',
@@ -160,6 +180,11 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       referenceNow: '11:45',
     },
     expectedOutcomeType: 'CONFLICTING',
+    defaultReportPrompt: {
+      en: 'Cannot find Mechanical Gaming Keyboard at expected bin C03.',
+      hi: 'मैकेनिकल गेमिंग कीबोर्ड अपेक्षित बिन C03 में नहीं मिल रहा है।',
+      kn: 'ಮೆಕ್ಯಾನಿಕಲ್ ಗೇಮಿಂಗ್ ಕೀಬೋರ್ಡ್ ನಿರೀಕ್ಷಿತ ಬಿನ್ C03 ನಲ್ಲಿ ಸಿಗುತ್ತಿಲ್ಲ.',
+    },
   },
   {
     id: 'scenario-5',
@@ -192,6 +217,11 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       referenceNow: '09:30',
     },
     expectedOutcomeType: 'STALE',
+    defaultReportPrompt: {
+      en: 'Cannot find Barcode Scanner Battery Pack at bin C18.',
+      hi: 'बारकोड स्कैनर बैटरी पैक बिन C18 में नहीं मिल रहा है।',
+      kn: 'ಬಾರ್ಕೋಡ್ ಸ್ಕ್ಯಾನರ್ ಬ್ಯಾಟರಿ ಪ್ಯಾಕ್ ಬಿನ್ C18 ನಲ್ಲಿ ಸಿಗುತ್ತಿಲ್ಲ.',
+    },
   },
   {
     id: 'scenario-6',
@@ -212,6 +242,11 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     scannerRecords: [],
     cameraRecords: [],
     expectedOutcomeType: 'LESS_QUANTITY',
+    defaultReportPrompt: {
+      en: 'The dispatch order asks me to pick 10 cable harnesses, but I can find only 6.',
+      hi: 'डिस्पैच ऑर्डर 10 केबल हार्नेस लेने को कहता है, लेकिन मुझे केवल 6 ही मिल रहे हैं।',
+      kn: 'ರವಾನೆ ಆದೇಶವು 10 ಕೇಬಲ್ ಹಾರ್ನೆಸ್‌ಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಲು ಕೇಳುತ್ತದೆ, ಆದರೆ ನನಗೆ ಕೇವಲ 6 ಮಾತ್ರ ಸಿಕ್ಕಿವೆ.',
+    },
   },
   {
     id: 'scenario-7',
@@ -232,6 +267,11 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     scannerRecords: [],
     cameraRecords: [],
     expectedOutcomeType: 'DAMAGED',
+    defaultReportPrompt: {
+      en: 'Found HMI Panel at bin E05, but packaging is crushed and screen is cracked.',
+      hi: 'बिन E05 पर HMI पैनल मिला, लेकिन पैकेजिंग दबी है और स्क्रीन टूटी है।',
+      kn: 'ಬಿನ್ E05 ನಲ್ಲಿ HMI ಪ್ಯಾನೆಲ್ ಸಿಕ್ಕಿದೆ, ಆದರೆ ಪ್ಯಾಕೇಜಿಂಗ್ ಜಜ್ಜಿದೆ ಮತ್ತು ಸ್ಕ್ರೀನ್ ಬಿರುಕು ಬಿಟ್ಟಿದೆ.',
+    },
   },
   {
     id: 'scenario-8',
@@ -271,6 +311,11 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       referenceNow: '06:05',
     },
     expectedOutcomeType: 'HIGH_VALUE_TIER3',
+    defaultReportPrompt: {
+      en: 'Cannot find PLC Module at expected locked cage bay E10.',
+      hi: 'पीएलसी मॉड्यूल अपेक्षित लॉक किए गए केज बे E10 में नहीं मिल रहा है।',
+      kn: 'ಲಾಕ್ ಮಾಡಿದ ಕೇಜ್ ಬೇ E10 ನಲ್ಲಿ ಪಿಎಲ್ಸಿ ಮಾಡ್ಯೂಲ್ ಸಿಗುತ್ತಿಲ್ಲ.',
+    },
   },
 ];
 
