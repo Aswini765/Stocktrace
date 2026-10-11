@@ -12,7 +12,7 @@ const SAMPLE_QUERIES = [
   'Failed pick escalation',
   'What to do if item is damaged',
   'Wrong quantity found at bin',
-  'Conflicting camera and scanner evidence',
+  'Conflicting scanner and transaction evidence',
   'Where is SKU-9999 located right now?', // Refusal test case
 ];
 

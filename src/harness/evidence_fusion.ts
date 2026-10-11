@@ -157,13 +157,19 @@ export function fuseEvidence(
       ? `older than ${STALE_THRESHOLD_HOURS} hours (${stalenessAgeHours.toFixed(1)}h old)`
       : `older than ${STALE_THRESHOLD_HOURS} hours`;
 
+    const lastRec = recorded[recorded.length - 1];
+    const staleCandidate = (lastRec?.destination_location && lastRec.destination_location !== 'UNKNOWN' && lastRec.destination_location !== '—')
+      ? lastRec.destination_location
+      : undefined;
+
     return {
       sku,
       expectedLocation,
       classification: 'STALE',
       recordedEvidence: recorded,
       observedEvidence: observed,
-      movementPath: [expectedLocation],
+      targetLocationCandidate: staleCandidate,
+      movementPath: [expectedLocation, ...(staleCandidate && staleCandidate !== expectedLocation ? [staleCandidate] : [])],
       summary: {
         scannerSummary: `Historical scanner record exists but is ${ageDesc}.`,
         cameraSummary: 'Camera footage has expired or is stale.',

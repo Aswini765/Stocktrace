@@ -6,6 +6,8 @@ export type TabType =
   | 'discrepancies'
   | 'data-sources';
 
+export type { DispatchOrder } from './services/dispatch/dispatchService';
+
 export type ScenarioType =
   | 'happy-path'
   | 'no-camera'
@@ -21,6 +23,8 @@ export type CaseStatus =
   | 'RESOLVED'
   | 'ESCALATED';
 
+export type CasePriority = 'HIGH' | 'MEDIUM' | 'NORMAL';
+
 export type WorkerVerificationOutcome =
   | 'FOUND'
   | 'NOT_FOUND'
@@ -29,6 +33,71 @@ export type WorkerVerificationOutcome =
   | 'DAMAGED'
   | 'ESCALATE';
 
+export type AppRole = 'home' | 'picker' | 'supervisor' | 'manager';
+
+export type EvidenceType =
+  | 'TRANSACTION_SCANNER'
+  | 'SCANNER_ONLY'
+  | 'TRANSACTION_ONLY'
+  | 'INSUFFICIENT';
+
+export type EvidenceTier =
+  | 'TIER_1_SCANNER_WMS'
+  | 'TIER_2_TARGETED_CAMERA'
+  | 'TIER_3_CONDITIONAL_AI'
+  | 'INSUFFICIENT'
+  | 'CONFLICTING'
+  | 'STALE'
+  | EvidenceType;
+
+export interface CaseAuditEntry {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  details: string;
+  tierUsed?: EvidenceTier;
+}
+
+export interface RoiAssumptions {
+  failedPicksPerDay: number;
+  operatingDaysPerMonth: number;
+  searchTimeBeforeMins: number;
+  searchTimeAfterMins: number;
+  hourlyLaborCost: number;
+  delayedOrdersPercent: number;
+  avgOrderValue: number;
+  contributionMarginPercent: number;
+  stockWriteOffPercent: number;
+  avgItemWriteOffCost: number;
+  expectedRecoveryRatePercent: number;
+  avgInvestigationCostPerCase: number;
+  monthlySoftwareCost: number;
+  // Backward compatibility
+  avgItemValue?: number;
+}
+
+export interface CameraEvidenceDetail {
+  cameraId: string;
+  timestamp: string;
+  observation: string;
+  limitation: string;
+  videoClipUrl?: string;
+  status: 'AVAILABLE' | 'UNAVAILABLE' | 'BLIND_SPOT';
+}
+
+export interface Tier3AiAnalysisDetail {
+  eligible: boolean;
+  ineligibilityReason?: string;
+  status: 'NOT_RUN' | 'RUNNING' | 'COMPLETED' | 'BLOCKED_BY_GUARDRAIL';
+  triggeredReason?: string;
+  estimatedCostInr: number;
+  visualConfidence?: number;
+  analysisSummary?: string;
+  detectedLocation?: string;
+  timestamp?: string;
+}
+
 export interface FailedPickCase {
   id: string;
   sku: string;
@@ -36,6 +105,7 @@ export interface FailedPickCase {
   qty: number;
   expectedLocation: string;
   status: CaseStatus;
+  priority?: CasePriority;
   orderNumber?: string;
   destinationBin?: string;
   reportedAt?: string;
@@ -47,6 +117,27 @@ export interface FailedPickCase {
   investigationId?: string;
   discrepancyId?: string;
   movementPath?: string;
+  // V2 Product Extensions
+  itemValue?: number;
+  orderValue?: number;
+  evidenceTierUsed?: EvidenceTier;
+  tierResolutionNote?: string;
+  landmarkHint?: string;
+  binDiagramUrl?: string;
+  pickerOutcome?: WorkerVerificationOutcome;
+  pickerNotes?: string;
+  pickerTimestamp?: string;
+  foundQuantity?: number;
+  damageReason?: string;
+  photoUrl?: string;
+  voiceInstructionText?: {
+    en: string;
+    hi: string;
+    kn: string;
+  };
+  cameraEvidence?: CameraEvidenceDetail;
+  tier3AiAnalysis?: Tier3AiAnalysisDetail;
+  auditTrail?: CaseAuditEntry[];
 }
 
 // Backward compatibility alias
@@ -63,18 +154,6 @@ export interface ScannerTransaction {
   scannerId: string;
 }
 
-export interface CameraEvent {
-  camera: string;
-  timeRange: string;
-  exactTime: string;
-  date?: string;
-  statusText: string;
-  eventDescription: string;
-  frameVisualType: 'a12' | 'aisle3' | 'b07' | 'c03' | 'empty';
-  sourceLocation?: string;
-  destinationLocation?: string;
-}
-
 export interface InvestigationRecord {
   id: string;
   caseId?: string;
@@ -87,6 +166,7 @@ export interface InvestigationRecord {
   resolutionTime: string;
   timestamp: string;
   reason?: string;
+  evidenceTier?: EvidenceTier;
 }
 
 export interface DiscrepancyRecord {
@@ -113,4 +193,3 @@ export interface DataSourceItem {
   lastSync: string;
   recordCount: string;
 }
-

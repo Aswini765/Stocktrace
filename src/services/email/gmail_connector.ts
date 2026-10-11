@@ -48,7 +48,8 @@ export class GmailConnector implements EmailProvider {
     // Configured recipient such as warehouse supervisor or operator email
     this.defaultRecipient =
       defaultRecipient ||
-      (import.meta.env.VITE_SUPERVISOR_EMAIL as string) ||
+      (typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_SUPERVISOR_EMAIL as string) : '') ||
+      (typeof process !== 'undefined' && process.env ? (process.env.VITE_SUPERVISOR_EMAIL as string) : '') ||
       '';
   }
 
@@ -120,7 +121,10 @@ export class GmailConnector implements EmailProvider {
    * Scoped ONLY to 'https://www.googleapis.com/auth/gmail.send'.
    */
   public async requestAuthorization(): Promise<string> {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
+    const clientId =
+      (typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) : '') ||
+      (typeof process !== 'undefined' && process.env ? (process.env.VITE_GOOGLE_CLIENT_ID as string) : '') ||
+      '';
     if (!clientId) {
       const err = 'Google Client ID is not configured in environment variables (VITE_GOOGLE_CLIENT_ID).';
       this.lastError = err;

@@ -28,7 +28,7 @@ Case: ${context.caseId}
 SKU: ${context.sku}${context.itemName ? ` (${context.itemName})` : ''}
 Expected Location: ${context.expectedLocation}
 Recommended Location: ${context.recommendedLocation || 'None (Requires Supervisor Inspection)'}
-Evidence: ${context.cameraEvidenceSummary ? 'Scanner + Camera' : 'Scanner Only'}
+Evidence: Warehouse Transaction + Scanner Movement
 Status: ${context.status}
 
 Action:
@@ -50,7 +50,7 @@ Warehouse: Bengaluru DC (DC-BLR-01)`;
 
   /**
    * Template B: Conflicting evidence
-   * Triggered when scanner logs point to one location but camera surveillance detects movement toward another.
+   * Triggered when transaction logs point to one location but scanner activity indicates movement toward another.
    */
   public static formatConflictingEvidenceEmail(
     context: EmailTriggerContext,
@@ -65,7 +65,7 @@ SKU: ${context.sku}${context.itemName ? ` (${context.itemName})` : ''}
 Scanner Evidence:
 ${context.scannerEvidenceSummary || `Last recorded location: ${context.expectedLocation}`}
 
-Camera Evidence:
+Movement Evidence:
 ${context.cameraEvidenceSummary || 'Movement observed in conflicting aisle/bay'}
 
 Status:
@@ -108,7 +108,7 @@ Status: ${context.status}
 Scanner Record:
 ${context.scannerEvidenceSummary || 'N/A'}
 
-Camera Observation:
+Movement Record:
 ${context.cameraEvidenceSummary || 'N/A'}
 
 Next Action:

@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import {
   Server,
   Scan,
-  Camera,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Mail,
   Send,
-  CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
 import { DataSourceItem } from '../types';
@@ -22,25 +21,25 @@ export const DataSourcesView: React.FC<DataSourcesViewProps> = ({ dataSources })
   const [isSendingTest, setIsSendingTest] = useState<boolean>(false);
   const [testStatus, setTestStatus] = useState<SendEmailResult | null>(null);
 
-  // Normalize system display names as requested: Inventory Data, Scanner Activity, Camera Footage
+  // Enterprise data sources: Transaction logs, Scanner movements, Human physical verification
   const systems = [
     {
       id: 'inv',
-      name: 'Inventory Data',
+      name: 'Warehouse Transactions',
       icon: Server,
-      desc: 'Item locations and expected bin positions.',
+      desc: 'WMS inventory records, put-away timestamps, and expected bin allocations.',
     },
     {
       id: 'scan',
-      name: 'Scanner Activity',
+      name: 'Scanner Movement Stream',
       icon: Scan,
-      desc: 'Recent scan movements and barcode scans.',
+      desc: 'Real-time handheld barcode scans, tote movements, and transfer activity.',
     },
     {
-      id: 'cam',
-      name: 'Camera Footage',
-      icon: Camera,
-      desc: 'Overhead camera feeds covering warehouse aisles.',
+      id: 'verify',
+      name: 'Physical Verification Queue',
+      icon: CheckCircle2,
+      desc: 'Direct human confirmations and bin inspection logs from mobile picker flow.',
     },
   ];
 

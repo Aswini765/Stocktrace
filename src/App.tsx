@@ -6,6 +6,7 @@ import {
   InvestigationRecord,
   DiscrepancyRecord,
   WorkerVerificationOutcome,
+  AppRole,
 } from './types';
 import {
   INITIAL_FAILED_CASES,
@@ -23,15 +24,24 @@ import { InvestigationsView } from './components/InvestigationsView';
 import { DiscrepanciesView } from './components/DiscrepanciesView';
 import { DataSourcesView } from './components/DataSourcesView';
 import { SopGuidanceModal } from './components/SopGuidanceModal';
+import { HomeLandingView } from './components/home/HomeLandingView';
+import { PickerWhatsAppView } from './components/picker/PickerWhatsAppView';
+import { ManagerRoiDashboard } from './components/manager/ManagerRoiDashboard';
+import { FutureRoadmapModal } from './components/FutureRoadmapModal';
 import { CheckCircle2, X } from 'lucide-react';
 
 export default function App() {
-  // Primary operational tab starts on OPEN CASES
+  // Current Persona Role (Section 3: Core V2 Requirement)
+  // 'home' | 'picker' | 'supervisor' | 'manager'
+  const [currentRole, setCurrentRole] = useState<AppRole>('home');
+
+  // Supervisor operational tab navigation
   const [currentTab, setCurrentTab] = useState<TabType>('open-cases');
   const [currentScenario, setCurrentScenario] = useState<ScenarioType>('happy-path');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSopModalOpen, setIsSopModalOpen] = useState<boolean>(false);
+  const [isRoadmapModalOpen, setIsRoadmapModalOpen] = useState<boolean>(false);
 
   // Collections state
   const [cases, setCases] = useState<FailedPickCase[]>(INITIAL_FAILED_CASES);
@@ -55,10 +65,11 @@ export default function App() {
   const escalatedCount = cases.filter((c) => c.status === 'ESCALATED').length;
   const avgResolutionTime = '02:41';
 
-  // Picker opens a failed pick case
+  // Supervisor opens a failed pick case
   const handleOpenCase = (c: FailedPickCase) => {
     setActiveCaseId(c.id);
     setCurrentTab('open-cases');
+    setCurrentRole('supervisor');
   };
 
   const handleBackToOpenCases = () => {
@@ -78,6 +89,9 @@ export default function App() {
               completedAt: undefined,
               investigationId: undefined,
               discrepancyId: undefined,
+              pickerOutcome: undefined,
+              pickerNotes: undefined,
+              pickerTimestamp: undefined,
             }
           : c
       )
@@ -86,6 +100,33 @@ export default function App() {
     setCurrentTab('open-cases');
   };
 
+  const handleRequestRecheck = (caseId: string) => {
+    setCases((prev) =>
+      prev.map((c) =>
+        c.id === caseId
+          ? {
+              ...c,
+              status: 'TRY_LOCATION',
+              pickerOutcome: undefined,
+              pickerNotes: undefined,
+              auditTrail: [
+                ...(c.auditTrail || []),
+                {
+                  id: `AUD-${Date.now()}`,
+                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  actor: 'Warehouse Supervisor',
+                  action: 'RECHECK_REQUESTED',
+                  details: 'Supervisor requested floor associate re-check.',
+                },
+              ],
+            }
+          : c
+      )
+    );
+    setResolutionNotice(`Re-check requested for case ${caseId}. Assigned back to floor associate.`);
+  };
+
+  // Shared Resolution Handler
   const handleCompleteResolution = (details: {
     sku: string;
     itemName: string;
@@ -130,7 +171,7 @@ export default function App() {
     const discReason =
       details.discrepancyReason ||
       (details.status === 'Resolved'
-        ? 'Item found at unexpected location following camera trace'
+        ? 'Item found at unexpected location following movement trace'
         : `Verification result: ${details.outcome || 'NOT_FOUND'} at ${details.verifiedLocation}`);
 
     const newDisc: DiscrepancyRecord = {
@@ -152,7 +193,7 @@ export default function App() {
 
     if (details.status === 'Resolved') {
       setResolutionNotice(
-        `✓ ${details.sku} resolved: Found at ${details.verifiedLocation}. Case moved to Completed Cases.`
+        `✓ ${details.sku} resolved: Found at ${details.verifiedLocation}. Case verified & moved to Completed Cases.`
       );
     } else if (details.outcome === 'PARTIALLY_FOUND') {
       setResolutionNotice(
@@ -189,50 +230,98 @@ export default function App() {
               completedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               investigationId: invId,
               discrepancyId: discId,
+              pickerOutcome: details.outcome,
+              pickerNotes: details.discrepancyReason,
+              pickerTimestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              auditTrail: [
+                ...(c.auditTrail || []),
+                {
+                  id: `AUD-${Date.now()}`,
+                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  actor: details.status === 'Resolved' ? 'Picker #12' : 'Supervisor / Associate',
+                  action: details.status === 'Resolved' ? 'PHYSICAL_VERIFICATION_FOUND' : 'EXCEPTION_VERIFIED_ESCALATED',
+                  details: details.discrepancyReason || `Verified outcome: ${details.outcome || 'NOT_FOUND'}`,
+                  tierUsed: c.evidenceTierUsed,
+                },
+              ],
             }
           : c
       )
     );
   };
 
-  const handleResetDemo = () => {
-    setCases(INITIAL_FAILED_CASES);
-    setInvestigations(INITIAL_INVESTIGATIONS);
-    setDiscrepancies(INITIAL_DISCREPANCIES);
-    setActiveCaseId(null);
-    setCurrentScenario('happy-path');
+  // Handler for actions coming directly from Persona 1 (Picker WhatsApp View)
+  const handlePickerVerification = (details: {
+    caseId: string;
+    sku: string;
+    itemName: string;
+    expectedLocation: string;
+    verifiedLocation: string;
+    outcome: WorkerVerificationOutcome;
+    foundQuantity?: number;
+    notes?: string;
+  }) => {
+    handleCompleteResolution({
+      sku: details.sku,
+      itemName: details.itemName,
+      expectedLocation: details.expectedLocation,
+      verifiedLocation: details.verifiedLocation,
+      resolutionTime: '01:14',
+      evidence: 'Tier 1 — Scanner Data (Verified by Picker)',
+      status: details.outcome === 'FOUND' ? 'Resolved' : 'Escalated',
+      outcome: details.outcome,
+      foundQuantity: details.foundQuantity,
+      discrepancyReason: details.notes,
+    });
+  };
+
+  // Switch to Supervisor view directly from Picker or Home
+  const handleSwitchToSupervisor = (caseId?: string) => {
+    if (caseId) {
+      setActiveCaseId(caseId);
+    }
+    setCurrentRole('supervisor');
     setCurrentTab('open-cases');
-    setResolutionNotice('Prototype state restored to clean initial condition.');
   };
 
   return (
     <div className="flex h-screen w-full max-w-full overflow-hidden bg-slate-50 text-slate-900 font-sans antialiased">
-      {/* Sidebar navigation */}
-      <Sidebar
-        currentTab={currentTab}
-        onSelectTab={(tab) => {
-          setCurrentTab(tab);
-          setActiveCaseId(null);
-        }}
-        openCasesCount={openCases.length}
-        completedCount={completedCases.length}
-        discrepanciesCount={discrepancies.length}
-        connectedSystemsCount={3}
-        isMobileOpen={isMobileMenuOpen}
-        onCloseMobile={() => setIsMobileMenuOpen(false)}
-      />
+      {/* Sidebar navigation: active in Supervisor console */}
+      {currentRole === 'supervisor' && (
+        <Sidebar
+          currentTab={currentTab}
+          onSelectTab={(tab) => {
+            setCurrentTab(tab);
+            setActiveCaseId(null);
+          }}
+          openCasesCount={openCases.length}
+          completedCount={completedCases.length}
+          discrepanciesCount={discrepancies.length}
+          connectedSystemsCount={3}
+          isMobileOpen={isMobileMenuOpen}
+          onCloseMobile={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
       {/* Main app viewport */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overflow-x-hidden">
-        {/* Top operational bar */}
+        {/* Top Bar with Role Switcher */}
         <TopBar
+          currentRole={currentRole}
+          onSelectRole={(role) => {
+            setCurrentRole(role);
+            if (role === 'supervisor') {
+              setCurrentTab('open-cases');
+            }
+          }}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
           onOpenSopModal={() => setIsSopModalOpen(true)}
+          onOpenRoadmapModal={() => setIsRoadmapModalOpen(true)}
         />
 
         {/* Global resolution notice banner */}
         {resolutionNotice && (
-          <div className="bg-emerald-50 border-b border-emerald-200 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs text-emerald-900 font-medium animate-in fade-in">
+          <div className="bg-emerald-50 border-b border-emerald-200 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs text-emerald-900 font-medium animate-in fade-in shrink-0">
             <div className="flex items-center space-x-2 truncate">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span className="truncate">{resolutionNotice}</span>
@@ -248,68 +337,106 @@ export default function App() {
 
         {/* Active View Container */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-full overflow-x-hidden">
-          {/* TAB 1: OPEN CASES / ACTIVE CASE RESOLUTION FLOW */}
-          {currentTab === 'open-cases' && (
-            activeCase ? (
-              <CaseResolutionFlow
-                caseData={activeCase}
-                scenario={currentScenario}
-                onCompleteResolution={handleCompleteResolution}
-                onBackToOpenCases={handleBackToOpenCases}
-                onResetCase={() => handleResetCase(activeCase.id)}
-              />
-            ) : (
-              <OpenCasesView
-                cases={cases}
-                onOpenCase={handleOpenCase}
-                onViewCompleted={() => setCurrentTab('completed-cases')}
-                completedCount={completedCases.length}
-              />
-            )
-          )}
-
-          {/* TAB 2: COMPLETED CASES */}
-          {currentTab === 'completed-cases' && (
-            <CompletedCasesView
-              cases={cases}
-              onReopenCase={(c) => {
-                handleResetCase(c.id);
-                handleOpenCase(c);
-              }}
-              onBackToOpenCases={() => setCurrentTab('open-cases')}
-            />
-          )}
-
-          {/* TAB 3: SUPERVISOR DASHBOARD */}
-          {currentTab === 'dashboard' && (
-            <DashboardView
-              cases={cases}
-              onOpenCase={handleOpenCase}
-              onGoToOpenCases={() => {
-                setActiveCaseId(null);
-                setCurrentTab('open-cases');
-              }}
+          {/* VIEW A: HOME SCREEN / ROLE SELECTOR */}
+          {currentRole === 'home' && (
+            <HomeLandingView
+              onSelectRole={(role) => setCurrentRole(role)}
               openCasesCount={openCases.length}
-              resolvedCount={resolvedCount}
-              escalatedCount={escalatedCount}
-              avgResolutionTime={avgResolutionTime}
-              activeCase={activeCase}
+              completedCount={completedCases.length}
+              cases={cases}
             />
           )}
 
-          {/* TAB 4: INVESTIGATION LOGS */}
-          {currentTab === 'investigations' && (
-            <InvestigationsView investigations={investigations} />
+          {/* VIEW B: PERSONA 1 — PICKER (WHATSAPP MOBILE) */}
+          {currentRole === 'picker' && (
+            <PickerWhatsAppView
+              cases={cases}
+              activeCaseId={activeCaseId}
+              onSelectCase={(id) => setActiveCaseId(id)}
+              onPickerVerification={handlePickerVerification}
+              onResetCase={handleResetCase}
+              onSwitchToSupervisor={handleSwitchToSupervisor}
+            />
           )}
 
-          {/* TAB 5: DISCREPANCIES */}
-          {currentTab === 'discrepancies' && (
-            <DiscrepanciesView discrepancies={discrepancies} />
+          {/* VIEW C: PERSONA 3 — MANAGER (ROI DASHBOARD) */}
+          {currentRole === 'manager' && (
+            <ManagerRoiDashboard
+              onGoToSupervisor={() => setCurrentRole('supervisor')}
+              onGoToPicker={() => setCurrentRole('picker')}
+              cases={cases}
+              investigations={investigations}
+            />
           )}
 
-          {/* TAB 6: CONNECTED SYSTEMS */}
-          {currentTab === 'data-sources' && (
-            <DataSourcesView dataSources={DATA_SOURCES} />
+          {/* VIEW D: PERSONA 2 — SUPERVISOR CONSOLE */}
+          {currentRole === 'supervisor' && (
+            <>
+              {/* TAB 1: OPEN CASES / ACTIVE CASE RESOLUTION FLOW */}
+              {currentTab === 'open-cases' && (
+                activeCase ? (
+                  <CaseResolutionFlow
+                    caseData={activeCase}
+                    scenario={currentScenario}
+                    onCompleteResolution={handleCompleteResolution}
+                    onBackToOpenCases={handleBackToOpenCases}
+                    onResetCase={() => handleResetCase(activeCase.id)}
+                    onRequestRecheck={handleRequestRecheck}
+                  />
+                ) : (
+                  <OpenCasesView
+                    cases={cases}
+                    onOpenCase={handleOpenCase}
+                    onViewCompleted={() => setCurrentTab('completed-cases')}
+                    completedCount={completedCases.length}
+                  />
+                )
+              )}
+
+              {/* TAB 2: COMPLETED CASES */}
+              {currentTab === 'completed-cases' && (
+                <CompletedCasesView
+                  cases={cases}
+                  onReopenCase={(c) => {
+                    handleResetCase(c.id);
+                    handleOpenCase(c);
+                  }}
+                  onBackToOpenCases={() => setCurrentTab('open-cases')}
+                />
+              )}
+
+              {/* TAB 3: SUPERVISOR DASHBOARD */}
+              {currentTab === 'dashboard' && (
+                <DashboardView
+                  cases={cases}
+                  onOpenCase={handleOpenCase}
+                  onGoToOpenCases={() => {
+                    setActiveCaseId(null);
+                    setCurrentTab('open-cases');
+                  }}
+                  openCasesCount={openCases.length}
+                  resolvedCount={resolvedCount}
+                  escalatedCount={escalatedCount}
+                  avgResolutionTime={avgResolutionTime}
+                  activeCase={activeCase}
+                />
+              )}
+
+              {/* TAB 4: INVESTIGATION LOGS */}
+              {currentTab === 'investigations' && (
+                <InvestigationsView investigations={investigations} />
+              )}
+
+              {/* TAB 5: DISCREPANCIES */}
+              {currentTab === 'discrepancies' && (
+                <DiscrepanciesView discrepancies={discrepancies} />
+              )}
+
+              {/* TAB 6: CONNECTED SYSTEMS */}
+              {currentTab === 'data-sources' && (
+                <DataSourcesView dataSources={DATA_SOURCES} />
+              )}
+            </>
           )}
         </main>
       </div>
@@ -318,6 +445,12 @@ export default function App() {
       <SopGuidanceModal
         isOpen={isSopModalOpen}
         onClose={() => setIsSopModalOpen(false)}
+      />
+
+      {/* Privacy Guardrails & Future Roadmap Modal */}
+      <FutureRoadmapModal
+        isOpen={isRoadmapModalOpen}
+        onClose={() => setIsRoadmapModalOpen(false)}
       />
     </div>
   );

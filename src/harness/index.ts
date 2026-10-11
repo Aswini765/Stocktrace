@@ -97,7 +97,7 @@ export function querySop(query: string): SopQueryResult {
  * Main Pipeline Entrypoint 4: Automated Evaluation Suite
  * Executes Section 24 test cases E1 through E10.
  */
-export function evaluateSuite() {
+export async function evaluateSuite() {
   return runStockTraceEvaluationSuite();
 }
 

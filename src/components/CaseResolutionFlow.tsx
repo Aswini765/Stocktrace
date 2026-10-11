@@ -1,28 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import {
-  MapPin,
   ArrowLeft,
-  Play,
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Loader2,
-  Mail,
+  RotateCcw,
+  Package,
+  Layers,
+  Clock,
+  ShieldCheck,
+  Check,
+  X,
+  FileText,
+  Video,
+  Cpu,
+  Scan,
+  AlertCircle,
+  History,
+  Send,
+  Eye,
+  ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
-import { FailedPickCase, ScenarioType, WorkerVerificationOutcome } from '../types';
-import { CameraVideoPlayerModal, CameraFootageItem } from './CameraVideoPlayerModal';
-import {
-  stockTraceEngine,
-  runInvestigation,
-  verifyCase,
-  InvestigationExecutionResult,
-} from '../harness';
-import { SCANNER_TRANSACTIONS, CAMERA_EVENTS } from '../data/mockData';
-import { stockTraceNotifier, SendEmailResult } from '../services/email';
+import { FailedPickCase, ScenarioType, WorkerVerificationOutcome, EvidenceTier } from '../types';
+import { SCANNER_TRANSACTIONS } from '../data/mockData';
 
 interface CaseResolutionFlowProps {
   caseData: FailedPickCase;
-  scenario: ScenarioType;
+  scenario?: ScenarioType;
   onCompleteResolution: (details: {
     sku: string;
     itemName: string;
@@ -37,1139 +42,660 @@ interface CaseResolutionFlowProps {
   }) => void;
   onBackToOpenCases: () => void;
   onResetCase?: () => void;
+  onRequestRecheck?: (caseId: string) => void;
 }
-
-type FlowStep =
-  | 'item-not-found'
-  | 'finding-item'
-  | 'where-to-look'
-  | 'result-found'
-  | 'result-not-found';
 
 export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
   caseData,
-  scenario,
   onCompleteResolution,
   onBackToOpenCases,
+  onResetCase,
+  onRequestRecheck,
 }) => {
-  const [currentStep, setCurrentStep] = useState<FlowStep>('item-not-found');
+  // Active Evidence Tier Tab: Tier 1 (Scanner), Tier 2 (Camera), Tier 3 (AI Video)
+  const [activeTierTab, setActiveTierTab] = useState<'tier-1' | 'tier-2' | 'tier-3'>('tier-1');
 
-  // Scenario state (can be initialized from prop or determined by caseData, and switchable)
-  const [activeScenario, setActiveScenario] = useState<ScenarioType>(() => {
-    if (caseData.id === 'CASE-3015') return 'conflict';
-    if (caseData.id === 'CASE-2081') return 'no-camera';
-    return scenario || 'happy-path';
-  });
-
-  // Keep in sync if parent changes scenario prop
-  useEffect(() => {
-    if (scenario) {
-      setActiveScenario(scenario);
-    }
-  }, [scenario]);
-
-  // StockTrace Case Engine Integration
-  const [investigationResult, setInvestigationResult] = useState<InvestigationExecutionResult | null>(null);
-
-  useEffect(() => {
-    stockTraceEngine.registerCase({
-      case_id: caseData.id,
-      sku: caseData.sku,
-      item_name: caseData.item,
-      expected_location: caseData.expectedLocation,
-      expected_quantity: caseData.qty,
-    });
-
-    const isStale = activeScenario === 'stale';
-    let scannerData = SCANNER_TRANSACTIONS[caseData.sku] || [];
-    let cameraData = CAMERA_EVENTS[caseData.sku] || [];
-
-    if (activeScenario === 'scanner-only') {
-      cameraData = [];
-    } else if (activeScenario === 'camera-only') {
-      scannerData = [];
-    } else if (activeScenario === 'stale') {
-      // Historical timestamps older than the 2-hour threshold (>3 hours old relative to 14:40)
-      scannerData = scannerData.map((s) => ({ ...s, time: '11:15' }));
-      cameraData = cameraData.map((c) => ({ ...c, exactTime: '11:18', timeRange: '11:16 – 11:20' }));
-    }
-
-    try {
-      const res = runInvestigation(caseData.id, scannerData, cameraData, {
-        forceScenario: (activeScenario === 'conflict' || activeScenario === 'no-camera') ? activeScenario : undefined,
-        isStale,
-        referenceNow: '14:40',
-      });
-      setInvestigationResult(res);
-    } catch (e) {
-      console.error('StockTrace investigation error:', e);
-    }
-  }, [caseData, activeScenario]);
-
-  // Automatic investigation checklist on Screen 2
-  const [investigationChecks, setInvestigationChecks] = useState({
-    recentActivity: false,
-    cameraFootage: false,
-    movementTracking: false,
-  });
-
-  // Camera video player modal state
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState<boolean>(false);
-  const [selectedFootage, setSelectedFootage] = useState<CameraFootageItem | null>(null);
-
-  // Outbound Email Notification feedback state
-  const [emailNotificationResult, setEmailNotificationResult] = useState<SendEmailResult | null>(null);
-
-  // Worker verification state
-  const [lastOutcome, setLastOutcome] = useState<WorkerVerificationOutcome | null>(null);
-  const [activeSubAction, setActiveSubAction] = useState<
-    'PARTIALLY_FOUND' | 'WRONG_QUANTITY' | 'DAMAGED' | null
-  >(null);
-  const [partialCount, setPartialCount] = useState<number>(
-    caseData.qty > 1 ? caseData.qty - 1 : 1
+  // Tier 3 Prototype AI execution state
+  const [isAiRunning, setIsAiRunning] = useState<boolean>(false);
+  const [tier3Completed, setTier3Completed] = useState<boolean>(
+    caseData.tier3AiAnalysis?.status === 'COMPLETED'
   );
-  const [wrongCount, setWrongCount] = useState<number>(0);
-  const [damageNotes, setDamageNotes] = useState<string>('Packaging crushed / inventory unusable');
 
-  // Derive active camera events based on scenario and SKU
-  const currentCameraEvents =
-    activeScenario === 'no-camera' || activeScenario === 'scanner-only'
-      ? []
-      : activeScenario === 'conflict'
-      ? (CAMERA_EVENTS['SKU-3015'] || [])
-      : (CAMERA_EVENTS[caseData.sku] || CAMERA_EVENTS['SKU-1042'] || []);
+  // Sub-actions and dialogs
+  const [verificationOutcome, setVerificationOutcome] = useState<WorkerVerificationOutcome | null>(
+    caseData.pickerOutcome || (caseData.status === 'RESOLVED' ? 'FOUND' : null)
+  );
+  const [subAction, setSubAction] = useState<'PARTIALLY_FOUND' | 'DAMAGED' | 'ESCALATE_CUSTOM' | null>(null);
+  const [customQty, setCustomQty] = useState<number>(caseData.qty > 1 ? caseData.qty - 1 : 1);
+  const [escalationReason, setEscalationReason] = useState<string>('Inventory count discrepancy / Bin search exhausted');
 
-  const cameraFootageList: CameraFootageItem[] = currentCameraEvents.map((evt, idx) => ({
-    id: `cam-${evt.frameVisualType || idx}`,
-    cameraName: evt.camera,
-    date: evt.date || '16 Sep 2026',
-    timestamp: evt.exactTime || '2:35 PM',
-    timeWindow: evt.timeRange || '2:32 PM – 2:35 PM',
-    zone: evt.camera.includes('AISLE')
-      ? 'Aisle 3'
-      : evt.camera.includes('A12')
-      ? 'Bay A12'
-      : evt.camera.includes('C03')
-      ? 'Bay C03'
-      : 'Bay B07',
-    description: evt.eventDescription,
-    type: evt.frameVisualType,
-    sourceLocation: evt.sourceLocation || 'A12',
-    targetLocation: evt.destinationLocation || (evt.frameVisualType === 'c03' ? 'C03' : 'B07'),
-    movementPath: `${evt.sourceLocation || 'A12'} → ${evt.destinationLocation || (evt.frameVisualType === 'c03' ? 'C03' : 'B07')}`,
-    sku: caseData.sku,
-  }));
-
-  // Screen 2: Automatic investigation timer that moves automatically to result
   useEffect(() => {
-    if (currentStep === 'finding-item') {
-      const t1 = setTimeout(() => {
-        setInvestigationChecks((prev) => ({ ...prev, recentActivity: true }));
-      }, 600);
-
-      const t2 = setTimeout(() => {
-        setInvestigationChecks((prev) => ({ ...prev, cameraFootage: true }));
-      }, 1200);
-
-      const t3 = setTimeout(() => {
-        setInvestigationChecks((prev) => ({ ...prev, movementTracking: true }));
-      }, 1800);
-
-      const t4 = setTimeout(() => {
-        setCurrentStep('where-to-look');
-      }, 2500);
-
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-        clearTimeout(t4);
-      };
+    if (caseData.pickerOutcome) {
+      setVerificationOutcome(caseData.pickerOutcome);
     }
-  }, [currentStep]);
+    if (caseData.tier3AiAnalysis?.status === 'COMPLETED') {
+      setTier3Completed(true);
+    }
+  }, [caseData.pickerOutcome, caseData.status, caseData.tier3AiAnalysis?.status]);
 
-  const handleStartInvestigation = () => {
-    setInvestigationChecks({
-      recentActivity: false,
-      cameraFootage: false,
-      movementTracking: false,
-    });
-    setCurrentStep('finding-item');
+  const scannerList = SCANNER_TRANSACTIONS[caseData.sku] || [
+    {
+      time: '14:32',
+      sku: caseData.sku,
+      fromLocation: 'Receiving',
+      toLocation: caseData.expectedLocation,
+      qty: caseData.qty,
+      type: 'Put-away',
+      scannerId: 'Scanner 07',
+    },
+    {
+      time: '14:35',
+      sku: caseData.sku,
+      fromLocation: caseData.expectedLocation,
+      toLocation: caseData.recommendedLocation || 'B07',
+      qty: caseData.qty,
+      type: 'Transfer',
+      scannerId: 'Scanner 07',
+    },
+  ];
+
+  // Staleness check
+  const isStale = caseData.evidenceTierUsed === 'STALE';
+  const isConflicting = caseData.evidenceTierUsed === 'CONFLICTING';
+  const isInsufficient = caseData.evidenceTierUsed === 'INSUFFICIENT';
+
+  // Tier 3 Eligibility check: threshold >= ₹5,000 or high priority or repeated checks
+  const isTier3Eligible = (caseData.itemValue || 0) >= 5000 || caseData.priority === 'HIGH' || caseData.tier3AiAnalysis?.eligible;
+
+  // Run Tier 3 prototype AI analysis
+  const handleRunTier3Analysis = () => {
+    if (!isTier3Eligible) return;
+    setIsAiRunning(true);
+    setTimeout(() => {
+      setIsAiRunning(false);
+      setTier3Completed(true);
+    }, 1200);
   };
 
-  const handleVerifyOutcome = (
-    outcome: WorkerVerificationOutcome,
-    actualQty?: number,
-    notes?: string
-  ) => {
-    setLastOutcome(outcome);
-    setActiveSubAction(null);
-    const recommendedLoc = investigationResult?.evaluation.topCandidate?.location || 'B07';
+  // Supervisor completes resolution
+  const handleSupervisorConfirm = (outcome: WorkerVerificationOutcome, qtyOverride?: number, customNote?: string) => {
+    setVerificationOutcome(outcome);
+    setSubAction(null);
 
-    if (outcome === 'FOUND') {
-      setCurrentStep('result-found');
-      verifyCase({
-        caseId: caseData.id,
-        outcome: 'FOUND',
-        verifiedLocation: recommendedLoc,
-        actualQuantity: caseData.qty,
-        role: 'OPERATOR',
-      });
+    const isResolved = outcome === 'FOUND';
+    const verifiedLocation = isResolved
+      ? (caseData.recommendedLocation || caseData.expectedLocation)
+      : '—';
 
-      onCompleteResolution({
-        sku: caseData.sku,
-        itemName: caseData.item,
-        expectedLocation: caseData.expectedLocation,
-        verifiedLocation: recommendedLoc,
-        resolutionTime: '02:41',
-        evidence: `StockTrace verified (${caseData.expectedLocation} → ${recommendedLoc})`,
-        status: 'Resolved',
-        outcome: 'FOUND',
-        foundQuantity: caseData.qty,
-      });
-      return;
-    }
-
-    setCurrentStep('result-not-found');
-    verifyCase({
-      caseId: caseData.id,
-      outcome,
-      verifiedLocation: outcome === 'NOT_FOUND' ? undefined : recommendedLoc,
-      actualQuantity: actualQty,
-      notes,
-      role: 'OPERATOR',
-    });
-
-    let evidenceSummary = '';
-    let discrepancyReason = '';
-
-    if (outcome === 'NOT_FOUND') {
-      evidenceSummary =
-        activeScenario === 'conflict'
-          ? 'Conflicting information between scanner and camera'
-          : activeScenario === 'no-camera'
-          ? 'No useful camera footage available'
-          : `Item physically absent at recommended location ${recommendedLoc || 'B07'}`;
-      discrepancyReason = `Item physically checked at ${recommendedLoc || 'recommended location'}; item absent.`;
-
-      // OUTBOUND ACTION TRIGGER:
-      if (activeScenario === 'conflict') {
-        stockTraceNotifier
-          .notifyConflictingEvidence({
-            caseId: caseData.id,
-            sku: caseData.sku,
-            itemName: caseData.item,
-            expectedLocation: caseData.expectedLocation,
-            scannerEvidenceSummary:
-              investigationResult?.evaluation.scannerEvidenceSummary ||
-              `Last recorded location: ${caseData.expectedLocation}`,
-            cameraEvidenceSummary:
-              investigationResult?.evaluation.cameraEvidenceSummary ||
-              'Movement observed toward C03',
-            status: 'Conflicting Evidence',
-            actionDirective: 'Physical verification required.',
-          })
-          .then((res) => setEmailNotificationResult(res))
-          .catch(() => {});
-      } else {
-        stockTraceNotifier
-          .notifyEscalationRequired({
-            caseId: caseData.id,
-            sku: caseData.sku,
-            itemName: caseData.item,
-            expectedLocation: caseData.expectedLocation,
-            recommendedLocation: recommendedLoc || undefined,
-            scannerEvidenceSummary: investigationResult?.evaluation.scannerEvidenceSummary,
-            cameraEvidenceSummary: investigationResult?.evaluation.cameraEvidenceSummary,
-            status: 'Verification Required',
-            actionDirective: recommendedLoc
-              ? `Please physically verify recommended location ${recommendedLoc}.`
-              : 'Please inspect warehouse bin and inventory records.',
-          })
-          .then((res) => setEmailNotificationResult(res))
-          .catch(() => {});
+    let reason = customNote || '';
+    if (!reason) {
+      if (outcome === 'FOUND') {
+        reason = `Supervisor audited physical item presence at ${verifiedLocation}.`;
+      } else if (outcome === 'NOT_FOUND') {
+        reason = `Supervisor verified item absent at ${caseData.recommendedLocation || caseData.expectedLocation}. Escalated.`;
+      } else if (outcome === 'PARTIALLY_FOUND') {
+        reason = `Partial quantity confirmed: ${qtyOverride || customQty} of ${caseData.qty} units.`;
+      } else if (outcome === 'DAMAGED') {
+        reason = 'Supervisor verified damaged/unusable stock. Sent for RTV/write-off processing.';
       }
-    } else if (outcome === 'PARTIALLY_FOUND') {
-      const found = actualQty ?? 1;
-      evidenceSummary = `Partially found ${found} of ${caseData.qty} at ${recommendedLoc}`;
-      discrepancyReason = `Partial pick: ${found} of ${caseData.qty} located at ${recommendedLoc}. Missing balance: ${caseData.qty - found}.`;
-    } else if (outcome === 'WRONG_QUANTITY') {
-      const found = actualQty ?? 0;
-      evidenceSummary = `Quantity discrepancy: expected ${caseData.qty}, found ${found}`;
-      discrepancyReason = `Inventory count mismatch at ${recommendedLoc}: expected ${caseData.qty}, counted ${found}.`;
-    } else if (outcome === 'DAMAGED') {
-      evidenceSummary = `Damaged stock located at ${recommendedLoc}`;
-      discrepancyReason = `Damaged inventory reported at ${recommendedLoc}: ${notes || 'Packaging damaged / unpickable'}.`;
-    } else if (outcome === 'ESCALATE') {
-      evidenceSummary = `Floor picker escalated case ${caseData.id} directly to supervisor`;
-      discrepancyReason = `Manual escalation by floor associate: ${notes || 'Immediate supervisor review required'}.`;
     }
 
     onCompleteResolution({
       sku: caseData.sku,
       itemName: caseData.item,
       expectedLocation: caseData.expectedLocation,
-      verifiedLocation: outcome === 'NOT_FOUND' ? '—' : recommendedLoc,
-      resolutionTime: '03:15',
-      evidence: evidenceSummary,
-      status: 'Escalated',
+      verifiedLocation,
+      resolutionTime: '02:41',
+      evidence: `Tier ${activeTierTab === 'tier-3' ? '3' : activeTierTab === 'tier-2' ? '2' : '1'} Evidence Chain`,
+      status: isResolved ? 'Resolved' : 'Escalated',
       outcome,
-      foundQuantity: actualQty,
-      discrepancyReason,
+      foundQuantity: qtyOverride || customQty,
+      discrepancyReason: reason,
     });
   };
 
-  const handleFound = () => handleVerifyOutcome('FOUND');
-  const handleNotFound = () => handleVerifyOutcome('NOT_FOUND');
-  const handleWrongQuantity = (actualQty: number = 0) => handleVerifyOutcome('WRONG_QUANTITY', actualQty);
-
-  const openCameraPlayer = (footageIdOrEvent?: string | CameraFootageItem | (typeof currentCameraEvents)[0]) => {
-    let item: CameraFootageItem | undefined;
-    if (typeof footageIdOrEvent === 'string') {
-      item = cameraFootageList.find((f) => f.id === footageIdOrEvent || f.cameraName === footageIdOrEvent);
-    } else if (footageIdOrEvent && 'camera' in footageIdOrEvent) {
-      item = cameraFootageList.find((f) => f.cameraName === footageIdOrEvent.camera);
-    } else if (footageIdOrEvent && 'cameraName' in footageIdOrEvent) {
-      item = footageIdOrEvent as CameraFootageItem;
-    }
-    setSelectedFootage(item || cameraFootageList[0] || null);
-    setIsVideoModalOpen(true);
-  };
-
   return (
-    <div className="max-w-2xl mx-auto space-y-6 w-full">
-      {/* Top Back Navigation Bar */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-        <button
-          onClick={onBackToOpenCases}
-          className="flex items-center space-x-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Open Cases</span>
-        </button>
-
-        <div className="flex items-center space-x-2.5">
-          <select
-            id="scenario-switcher"
-            aria-label="Demo Scenario"
-            value={activeScenario}
-            onChange={(e) => setActiveScenario(e.target.value as ScenarioType)}
-            className="text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md px-2 py-1 cursor-pointer"
-            title="Switch investigation scenario"
+    <div className="space-y-5 max-w-6xl mx-auto w-full pb-12">
+      {/* Top Header Navigation */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onBackToOpenCases}
+            className="p-1.5 rounded-md hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            title="Return to case list"
           >
-            <option value="happy-path">Agree (Try B07)</option>
-            <option value="conflict">Conflict (No match)</option>
-            <option value="no-camera">No Footage</option>
-            <option value="scanner-only">Scanner Only</option>
-            <option value="camera-only">Camera Only</option>
-            <option value="stale">Stale Data (&gt;2h)</option>
-          </select>
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="font-mono text-xs font-bold text-slate-950 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                {caseData.id}
+              </span>
+              <span className="text-xs text-slate-400">&bull;</span>
+              <span className="text-sm font-bold text-slate-900">{caseData.item}</span>
+              {caseData.priority === 'HIGH' && (
+                <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.2 rounded uppercase">
+                  High Priority
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Reported at {caseData.reportedAt || '14:34'} by {caseData.reportedBy || 'Picker'} &bull; Pick Task: {caseData.orderNumber || 'ORD-88201'}
+            </p>
+          </div>
+        </div>
 
-          <span className="font-mono text-xs font-bold text-slate-500">
-            {caseData.sku}
-          </span>
+        <div className="flex items-center space-x-2 text-xs">
+          {onRequestRecheck && (
+            <button
+              onClick={() => onRequestRecheck(caseData.id)}
+              className="text-xs text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+            >
+              Request Floor Re-check
+            </button>
+          )}
+
+          {onResetCase && (
+            <button
+              onClick={onResetCase}
+              className="text-xs text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3 h-3 inline mr-1" />
+              Reset Case
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* SCREEN 1: CASE DETAILS                                                    */}
-      {/* ========================================================================= */}
-      {currentStep === 'item-not-found' && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="space-y-4">
-            <div>
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                ITEM NOT FOUND
-              </span>
-            </div>
+      {/* Trust Principle Banner */}
+      <div className="bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 flex items-center justify-between text-xs text-slate-700">
+        <div className="flex items-center space-x-2">
+          <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0" />
+          <span>
+            <strong>Operational Principle:</strong> StockTrace recommends. Humans verify. Algorithmic recommendations never adjust inventory autonomously.
+          </span>
+        </div>
+        <span className="text-[10px] text-slate-400 hidden md:inline shrink-0 font-mono">
+          Bengaluru DC SOP 4.1
+        </span>
+      </div>
 
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+      {/* Main 3-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* COLUMN 1: CASE SUMMARY & PICKER RESPONSE (3 COLS) */}
+        <div className="lg:col-span-3 bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-4">
+          <div className="border-b border-slate-100 pb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Case Summary
+            </span>
+            <h2 className="text-sm font-bold text-slate-900 mt-0.5">
               {caseData.item}
             </h2>
+          </div>
 
-            <div className="space-y-2 pt-2 border-t border-slate-100 text-sm">
-              <div className="flex items-center space-x-2 text-slate-700">
-                <span className="text-slate-400 font-medium w-32">SKU:</span>
-                <span className="font-mono font-bold text-slate-900">{caseData.sku}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-slate-700">
-                <span className="text-slate-400 font-medium w-32">Quantity:</span>
-                <span className="font-bold text-slate-900">{caseData.qty}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-slate-700">
-                <span className="text-slate-400 font-medium w-32">Expected location:</span>
-                <span className="font-mono font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                  {caseData.expectedLocation}
-                </span>
-              </div>
+          <div className="space-y-2.5 text-xs">
+            <div>
+              <span className="text-slate-400 block text-[11px]">SKU:</span>
+              <span className="font-mono font-bold text-slate-900">{caseData.sku}</span>
+            </div>
+
+            <div>
+              <span className="text-slate-400 block text-[11px]">Expected Location:</span>
+              <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
+                {caseData.expectedLocation}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-slate-400 block text-[11px]">Expected Quantity:</span>
+              <span className="font-semibold text-slate-900">{caseData.qty} units</span>
+            </div>
+
+            <div>
+              <span className="text-slate-400 block text-[11px]">Tote / Pick Task:</span>
+              <span className="font-mono text-slate-700">{caseData.destinationBin || 'TOTE-44'} ({caseData.orderNumber || 'ORD-88201'})</span>
+            </div>
+
+            <div>
+              <span className="text-slate-400 block text-[11px]">Item Unit Value:</span>
+              <span className="font-mono font-semibold text-slate-900">
+                ₹{(caseData.itemValue || 0).toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            {/* Picker's Submitted Response */}
+            <div className="pt-2 border-t border-slate-100">
+              <span className="text-slate-400 block text-[11px]">Picker Floor Report:</span>
+              {caseData.pickerOutcome ? (
+                <div className="mt-1 p-2 rounded bg-slate-50 border border-slate-200 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-slate-900">{caseData.pickerOutcome}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{caseData.pickerTimestamp || 'Today'}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    {caseData.pickerNotes || 'Picker submitted physical verification on mobile terminal.'}
+                  </p>
+                </div>
+              ) : (
+                <span className="text-slate-400 italic text-[11px]">Awaiting floor picker confirmation</span>
+              )}
             </div>
           </div>
 
-          <div className="pt-4">
-            <button
-              id="btn-start-investigation"
-              onClick={handleStartInvestigation}
-              className="w-full py-4 px-6 bg-slate-900 hover:bg-slate-800 text-white text-base font-black rounded-xl flex items-center justify-center space-x-2 shadow-xs transition-colors cursor-pointer"
-            >
-              <span>FIND THIS ITEM &rarr;</span>
-            </button>
+          {/* Full Audit Trail Snippet */}
+          <div className="pt-2 border-t border-slate-100 space-y-2">
+            <div className="flex items-center space-x-1 text-slate-700 text-xs font-bold">
+              <History className="w-3.5 h-3.5" />
+              <span>Audit Trail ({caseData.auditTrail?.length || 2} events)</span>
+            </div>
+
+            <div className="space-y-1.5 text-[11px] font-mono">
+              {(caseData.auditTrail || [
+                {
+                  id: 'AUD-1',
+                  timestamp: caseData.reportedAt || '14:34',
+                  actor: 'Picker',
+                  action: 'FAILED_PICK',
+                  details: 'Item missing from expected bin.',
+                },
+                {
+                  id: 'AUD-2',
+                  timestamp: '14:35',
+                  actor: 'Evidence Engine',
+                  action: 'TIER_1_EVALUATED',
+                  details: 'Evaluated scanner transactions.',
+                },
+              ]).map((evt, idx) => (
+                <div key={idx} className="p-1.5 rounded bg-slate-50 border border-slate-100 text-slate-600 space-y-0.5">
+                  <div className="flex justify-between font-bold text-slate-800">
+                    <span>{evt.action}</span>
+                    <span className="text-[10px] text-slate-400">{evt.timestamp}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate">{evt.details}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* SCREEN 2: FINDING YOUR ITEM...                                           */}
-      {/* ========================================================================= */}
-      {currentStep === 'finding-item' && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 shadow-xs space-y-6 text-center">
-          <div className="space-y-3">
-            <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mx-auto">
-              <Loader2 className="w-7 h-7 animate-spin" />
+        {/* COLUMN 2: THREE INVESTIGATION TIERS (5 COLS) */}
+        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-4">
+          <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Evidence Engine
+              </span>
+              <h2 className="text-sm font-bold text-slate-900 mt-0.5">
+                3 Investigation Tiers
+              </h2>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              FINDING YOUR ITEM...
+            <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold">
+              Grounded Evidence
+            </span>
+          </div>
+
+          {/* Tier Selector Pills */}
+          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+            <button
+              onClick={() => setActiveTierTab('tier-1')}
+              className={`py-1.5 px-2 rounded-md transition-colors cursor-pointer text-center ${
+                activeTierTab === 'tier-1'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tier 1: Scanner
+            </button>
+            <button
+              onClick={() => setActiveTierTab('tier-2')}
+              className={`py-1.5 px-2 rounded-md transition-colors cursor-pointer text-center ${
+                activeTierTab === 'tier-2'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tier 2: Camera
+            </button>
+            <button
+              onClick={() => setActiveTierTab('tier-3')}
+              className={`py-1.5 px-2 rounded-md transition-colors cursor-pointer text-center ${
+                activeTierTab === 'tier-3'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tier 3: AI Video
+            </button>
+          </div>
+
+          {/* WARNING BANNERS (Stale, Conflicting, Insufficient) */}
+          {isStale && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs space-y-1">
+              <div className="flex items-center space-x-1.5 font-bold text-amber-900">
+                <AlertTriangle className="w-4 h-4 text-amber-700" />
+                <span>Stale Evidence Warning (&gt; 2 Hours Old)</span>
+              </div>
+              <p className="text-amber-950 text-[11px] leading-relaxed">
+                Last recorded movement occurred 28 hours ago. Old movement events do not prove current physical presence. Physical verification required.
+              </p>
+            </div>
+          )}
+
+          {isConflicting && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs space-y-1">
+              <div className="flex items-center space-x-1.5 font-bold text-rose-900">
+                <AlertCircle className="w-4 h-4 text-rose-700" />
+                <span>Conflicting Evidence Signals</span>
+              </div>
+              <p className="text-rose-950 text-[11px] leading-relaxed">
+                Scanner indicates transfer toward B07, while camera footage suggests movement toward C19. Recommendation halted to prevent incorrect pick.
+              </p>
+            </div>
+          )}
+
+          {isInsufficient && (
+            <div className="p-3 bg-slate-100 border border-slate-200 rounded-lg text-xs space-y-1">
+              <div className="flex items-center space-x-1.5 font-bold text-slate-800">
+                <AlertCircle className="w-4 h-4 text-slate-600" />
+                <span>Insufficient Tier 1 Evidence</span>
+              </div>
+              <p className="text-slate-700 text-[11px] leading-relaxed">
+                No movements recorded since put-away. StockTrace refuses to propose an arbitrary location.
+              </p>
+            </div>
+          )}
+
+          {/* TIER 1 VIEW: TRANSACTION & SCANNER */}
+          {activeTierTab === 'tier-1' && (
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold uppercase tracking-wider text-slate-500">
+                  Handheld Scanner Movement Stream
+                </span>
+                <span className="text-teal-700 font-semibold">Cost: ₹0 (Default)</span>
+              </div>
+
+              <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden font-mono text-[11px]">
+                {scannerList.map((s, idx) => (
+                  <div key={idx} className="p-2 border-b border-slate-200 last:border-b-0 flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-slate-800">{s.time}</span> &bull; <span>{s.type}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">{s.fromLocation} &rarr; </span>
+                      <strong className="text-slate-900">{s.toLocation}</strong>
+                    </div>
+                    <span className="text-slate-400 text-[10px]">{s.scannerId}</span>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Deterministic evidence rules evaluate SKU recency, origin, and destination timestamps.
+              </p>
+            </div>
+          )}
+
+          {/* TIER 2 VIEW: TARGETED CAMERA EVIDENCE */}
+          {activeTierTab === 'tier-2' && (
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold uppercase tracking-wider text-slate-500">
+                  Targeted Pre-recorded Camera Feed
+                </span>
+                <span className="text-indigo-700 font-semibold">Low Overhead</span>
+              </div>
+
+              {caseData.cameraEvidence?.status === 'BLIND_SPOT' ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center space-y-1">
+                  <Video className="w-6 h-6 text-slate-400 mx-auto" />
+                  <div className="font-bold text-slate-800 text-xs">Camera Blind Spot / Feed Offline</div>
+                  <p className="text-[11px] text-slate-500">
+                    Aisle 7 camera is unmonitored or obscured. Relies strictly on Tier 1 scanner evidence.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-slate-900 text-slate-200 rounded-lg p-3 space-y-2.5 border border-slate-800">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 border-b border-slate-800 pb-1.5">
+                    <span className="flex items-center space-x-1">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                      <span>{caseData.cameraEvidence?.cameraId || 'CAM-04-AISLE-3'}</span>
+                    </span>
+                    <span>{caseData.cameraEvidence?.timestamp || '14:34:18'}</span>
+                  </div>
+
+                  <div className="bg-slate-950 rounded p-2.5 border border-slate-800 text-[11px] space-y-1">
+                    <div className="text-teal-400 font-semibold">Visual Observation:</div>
+                    <p className="text-slate-300">
+                      {caseData.cameraEvidence?.observation || 'Floor associate cart observed departing A12 toward Bin B07.'}
+                    </p>
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 italic">
+                    <strong>Limitation:</strong> {caseData.cameraEvidence?.limitation || 'Viewing angle does not show shelf interior; verification required.'}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TIER 3 VIEW: CONDITIONAL AI VIDEO ANALYSIS */}
+          {activeTierTab === 'tier-3' && (
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold uppercase tracking-wider text-slate-500">
+                  Conditional Prototype AI Video Analysis
+                </span>
+                <span className="text-purple-700 font-semibold font-mono">Est. Compute: ₹120</span>
+              </div>
+
+              {/* Guardrail Check: Is item eligible? */}
+              {!isTier3Eligible ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center space-x-1.5 font-bold text-amber-900">
+                    <AlertTriangle className="w-4 h-4 text-amber-700" />
+                    <span>Blocked by Cost Guardrail</span>
+                  </div>
+                  <p className="text-amber-950 text-[11px] leading-relaxed">
+                    Item value (₹{(caseData.itemValue || 0).toLocaleString('en-IN')}) is below the ₹5,000 threshold required for automated AI video frame analysis.
+                  </p>
+                  <p className="text-[10px] text-amber-800">
+                    Prevents unprofitable compute spend on low-value inventory exceptions.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-lg bg-purple-50 border border-purple-200 text-purple-950 space-y-1 text-xs">
+                    <div className="font-bold flex items-center space-x-1">
+                      <Cpu className="w-3.5 h-3.5 text-purple-700" />
+                      <span>High-Value Exception Eligible</span>
+                    </div>
+                    <p className="text-[11px]">
+                      Item value ₹{(caseData.itemValue || 0).toLocaleString('en-IN')} meets threshold for prototype computer vision frame verification.
+                    </p>
+                  </div>
+
+                  {tier3Completed ? (
+                    <div className="bg-slate-900 text-slate-200 rounded-lg p-3 space-y-2 border border-slate-800 text-xs">
+                      <div className="flex justify-between items-center text-[11px] text-purple-400 font-mono">
+                        <span>FRAME MATCH &bull; CONFIDENCE 92%</span>
+                        <span>ANALYSIS COMPLETE</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        {caseData.tier3AiAnalysis?.analysisSummary || 'Multi-frame visual recognition confirmed manufacturer seal match placed into Bay E02/E14.'}
+                      </p>
+                      <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">
+                        Compute cost ₹120 logged to facility operational analysis ledger.
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleRunTier3Analysis}
+                      disabled={isAiRunning}
+                      className="w-full py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-2xs transition-colors"
+                    >
+                      {isAiRunning ? (
+                        <>
+                          <Cpu className="w-3.5 h-3.5 animate-spin" />
+                          <span>Processing CCTV Frame Sequence...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Cpu className="w-3.5 h-3.5" />
+                          <span>Run Prototype AI Video Analysis (~₹120)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* COLUMN 3: RESOLUTION & SUPERVISOR VERIFICATION (4 COLS) */}
+        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-4">
+          <div className="border-b border-slate-100 pb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Resolution State
+            </span>
+            <h2 className="text-sm font-bold text-slate-900 mt-0.5">
+              Recommendation &amp; Actions
             </h2>
           </div>
 
-          <div className="max-w-xs mx-auto text-left space-y-3 pt-2">
-            {/* Step 1: Recent activity */}
-            <div className="flex items-center space-x-3 text-sm">
-              {investigationChecks.recentActivity ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              ) : (
-                <Loader2 className="w-5 h-5 animate-spin text-slate-400 shrink-0" />
-              )}
-              <span className={`font-semibold ${investigationChecks.recentActivity ? 'text-slate-900' : 'text-slate-500'}`}>
-                Checking recent activity
+          {/* Suggested Location Box */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+            <span className="text-[11px] text-slate-500 font-medium block">
+              Suggested next location:
+            </span>
+            <div className="text-2xl font-mono font-bold text-teal-800">
+              {caseData.recommendedLocation && !isInsufficient && !isConflicting
+                ? caseData.recommendedLocation
+                : '—'}
+            </div>
+            <div className="text-[11px] text-slate-500">
+              {caseData.landmarkHint || 'Requires physical verification'}
+            </div>
+          </div>
+
+          {/* Status Attributes */}
+          <div className="space-y-1.5 text-xs">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Evidence status:</span>
+              <span className="font-semibold text-slate-900">
+                {caseData.evidenceTierUsed?.replace(/_/g, ' ')}
               </span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Floor verification:</span>
+              <span className="font-bold text-slate-900">
+                {caseData.pickerOutcome || 'Pending check'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Case status:</span>
+              <span className={`font-bold ${caseData.status === 'RESOLVED' ? 'text-emerald-700' : 'text-slate-900'}`}>
+                {caseData.status}
+              </span>
+            </div>
+          </div>
 
-            {/* Step 2: Camera footage */}
-            <div className="flex items-center space-x-3 text-sm">
-              {investigationChecks.cameraFootage ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              ) : (
-                <span className="w-5 h-5 rounded-full border-2 border-slate-200 flex items-center justify-center shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+          {/* Supervisor Decision Controls */}
+          <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
+            <span className="text-[11px] font-bold text-slate-700 block">
+              Authorized Supervisor Actions:
+            </span>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                id="btn-supervisor-confirm-found"
+                onClick={() => handleSupervisorConfirm('FOUND')}
+                className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Confirm Found</span>
+              </button>
+
+              <button
+                id="btn-supervisor-mark-not-found"
+                onClick={() => handleSupervisorConfirm('NOT_FOUND')}
+                className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Mark Not Found</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-1 text-[11px]">
+              <button
+                onClick={() => setSubAction(subAction === 'PARTIALLY_FOUND' ? null : 'PARTIALLY_FOUND')}
+                className="text-slate-600 hover:text-slate-900 underline cursor-pointer"
+              >
+                Log partial count
+              </button>
+              <button
+                onClick={() => handleSupervisorConfirm('DAMAGED')}
+                className="text-slate-600 hover:text-slate-900 underline cursor-pointer"
+              >
+                Log damaged stock
+              </button>
+              <button
+                onClick={() => setSubAction(subAction === 'ESCALATE_CUSTOM' ? null : 'ESCALATE_CUSTOM')}
+                className="text-rose-600 hover:text-rose-900 underline cursor-pointer"
+              >
+                Escalate case
+              </button>
+            </div>
+
+            {/* Sub-form: Partial count */}
+            {subAction === 'PARTIALLY_FOUND' && (
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 mt-2">
+                <span className="text-[11px] font-semibold text-slate-700 block">
+                  Audited count physically present:
                 </span>
-              )}
-              <span className={`font-semibold ${investigationChecks.cameraFootage ? 'text-slate-900' : 'text-slate-500'}`}>
-                Checking camera footage
-              </span>
-            </div>
+                <div className="flex space-x-1.5">
+                  <input
+                    type="number"
+                    min="1"
+                    max={caseData.qty}
+                    value={customQty}
+                    onChange={(e) => setCustomQty(Number(e.target.value))}
+                    className="w-16 px-2 py-1 border border-slate-300 rounded font-mono text-xs bg-white"
+                  />
+                  <button
+                    onClick={() => handleSupervisorConfirm('PARTIALLY_FOUND', customQty)}
+                    className="flex-1 py-1 bg-slate-900 text-white rounded text-xs font-semibold cursor-pointer"
+                  >
+                    Confirm {customQty} Units
+                  </button>
+                </div>
+              </div>
+            )}
 
-            {/* Step 3: Following the movement */}
-            <div className="flex items-center space-x-3 text-sm">
-              {investigationChecks.movementTracking ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              ) : (
-                <span className="w-5 h-5 rounded-full border-2 border-slate-200 flex items-center justify-center shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+            {/* Sub-form: Custom Escalation */}
+            {subAction === 'ESCALATE_CUSTOM' && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg space-y-1.5 mt-2">
+                <span className="text-[11px] font-semibold text-rose-900 block">
+                  Reason for supervisor escalation:
                 </span>
-              )}
-              <span className={`font-semibold ${investigationChecks.movementTracking ? 'text-slate-900' : 'text-slate-500'}`}>
-                Following the movement
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* SCREEN 3: RECOMMENDATION (TRY B07 / WHAT WE FOUND)                       */}
-      {/* ========================================================================= */}
-      {currentStep === 'where-to-look' && (
-        <div className="space-y-4">
-          {/* ==================== SCENARIO 1: RECOMMENDATION (AGREE / STALE / SINGLE SOURCE) ==================== */}
-          {(activeScenario === 'happy-path' ||
-            activeScenario === 'scanner-only' ||
-            activeScenario === 'camera-only' ||
-            activeScenario === 'stale') &&
-            investigationResult?.evaluation.confidenceState !== 'CONFLICTING' &&
-            investigationResult?.evaluation.confidenceState !== 'NO_CAMERA' && (
-            <div className="bg-white border-2 border-amber-500 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-              {/* Main recommendation at the top */}
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  {(activeScenario === 'stale' || investigationResult?.evaluation.confidenceState === 'LOW_STALE') && (
-                    <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                      <AlertTriangle className="w-3 h-3 text-amber-700" />
-                      <span>STALE DATA (&gt; 2 HOURS)</span>
-                    </span>
-                  )}
-                  {activeScenario === 'scanner-only' && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                      SCANNER RECORD ONLY
-                    </span>
-                  )}
-                  {activeScenario === 'camera-only' && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                      CAMERA VISUAL ONLY
-                    </span>
-                  )}
-                </div>
-
-                <h2 className="text-4xl sm:text-5xl font-black text-slate-950 tracking-tight">
-                  {investigationResult?.evaluation.recommendationDisplay || 'TRY B07'}
-                </h2>
-
-                {/* Movement Path */}
-                {investigationResult?.evaluation.movementPath && investigationResult.evaluation.movementPath.length > 1 && (
-                  <div className="pt-1">
-                    <div className="inline-flex items-center space-x-2 text-sm font-mono font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                      {investigationResult.evaluation.movementPath.map((step, idx) => (
-                        <React.Fragment key={idx}>
-                          {idx === 0 ? (
-                            <span className="text-slate-400 line-through">{step}</span>
-                          ) : idx === investigationResult.evaluation.movementPath.length - 1 ? (
-                            <span className="text-amber-700 font-black">{step}</span>
-                          ) : (
-                            <span className="text-slate-700">{step}</span>
-                          )}
-                          {idx < investigationResult.evaluation.movementPath.length - 1 && (
-                            <span className="text-slate-400">&rarr;</span>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Compact Combined Section: WHAT WE FOUND */}
-              <div className="space-y-4 pt-3 border-t border-slate-200">
-                <div className="text-xs font-black text-slate-400 tracking-wider uppercase">
-                  WHAT WE FOUND
-                </div>
-
-                {/* SCANNER EVIDENCE */}
-                <div className="space-y-1">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    SCANNER EVIDENCE
-                  </div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {investigationResult?.evaluation.scannerEvidenceSummary ||
-                      `Last recorded at ${caseData.expectedLocation || 'A12'} · 2:34 PM`}
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    Put-away &bull; Qty {caseData.qty}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    No movement was recorded after this.
-                  </p>
-                </div>
-
-                {/* CAMERA EVIDENCE (CONSOLIDATED PER SPECIFICATION) */}
-                <div className="space-y-3 pt-2 border-t border-slate-100">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    CAMERA EVIDENCE
-                  </div>
-                  {currentCameraEvents.length === 0 || activeScenario === 'scanner-only' ? (
-                    <p className="text-sm font-semibold text-slate-800">
-                      {investigationResult?.evaluation.cameraEvidenceSummary || 'No useful footage found.'}
-                    </p>
-                  ) : (
-                    <div
-                      id="camera-evidence-consolidated-card"
-                      className="bg-slate-50 border border-slate-200/90 rounded-xl p-4 sm:p-5 space-y-4 shadow-2xs"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-sm sm:text-base font-bold text-slate-950">
-                          Possible movement from A12 toward B07
-                        </p>
-                        <div className="text-xs font-mono font-bold text-slate-600">
-                          16 Sep 2026 · 2:32 PM – 2:37 PM
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200/80">
-                        <div className="space-y-1">
-                          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            Cameras:
-                          </div>
-                          <div className="text-xs font-semibold text-slate-800 flex items-center space-x-1.5 font-mono">
-                            <span>Bay A12</span>
-                            <span className="text-slate-400">&rarr;</span>
-                            <span>Aisle 3</span>
-                            <span className="text-slate-400">&rarr;</span>
-                            <span>Bay B07</span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            Movement sequence:
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 flex items-center space-x-1.5 font-mono">
-                            <span className="bg-slate-200/70 px-1.5 py-0.5 rounded text-slate-700">A12</span>
-                            <span className="text-slate-400">&rarr;</span>
-                            <span className="bg-slate-200/70 px-1.5 py-0.5 rounded text-slate-700">Aisle 3</span>
-                            <span className="text-slate-400">&rarr;</span>
-                            <span className="bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded">B07</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
-                        <button
-                          id="btn-view-video-consolidated"
-                          onClick={() => openCameraPlayer(cameraFootageList[0])}
-                          className="w-full sm:w-auto py-2.5 px-5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center space-x-2 transition-colors cursor-pointer shadow-xs active:scale-98"
-                        >
-                          <Play className="w-3.5 h-3.5 fill-current text-amber-400" />
-                          <span>VIEW VIDEO</span>
-                        </button>
-
-                        <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
-                          3 sequential camera observations
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* WHY LOCATION? */}
-                <div className="space-y-1 pt-2 border-t border-slate-100">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    WHY {investigationResult?.evaluation.topCandidate?.location || 'B07'}?
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {investigationResult?.evaluation.whyRationale ||
-                      `The scanner record shows the item was last recorded at ${caseData.expectedLocation || 'A12'}. Camera footage shows movement toward B07.`}
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Directive */}
-              <div className="pt-2 border-t border-slate-100">
-                <div className="text-xs text-slate-400 font-medium">Therefore:</div>
-                <p className="text-base sm:text-lg font-black text-slate-950 mt-0.5">
-                  {investigationResult?.evaluation.directiveText || 'PLEASE CHECK B07.'}
-                </p>
-              </div>
-
-              {/* Verification Action Bar (FOUND, NOT FOUND, PARTIALLY FOUND, WRONG QTY, DAMAGED, ESCALATE) */}
-              <div className="pt-2 border-t border-slate-200 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
-                    id="btn-outcome-found"
-                    onClick={() => handleVerifyOutcome('FOUND')}
-                    className="py-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm rounded-xl flex items-center justify-center space-x-2 shadow-xs transition-colors cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>FOUND</span>
-                  </button>
-
-                  <button
-                    id="btn-outcome-not-found"
-                    onClick={() => handleVerifyOutcome('NOT_FOUND')}
-                    className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-colors cursor-pointer border border-slate-300"
-                  >
-                    <XCircle className="w-4 h-4 text-slate-500" />
-                    <span>NOT FOUND</span>
-                  </button>
-                </div>
-
-                {/* Inline Exception Drawers */}
-                {activeSubAction === 'PARTIALLY_FOUND' && (
-                  <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-xl space-y-2.5 animate-in fade-in">
-                    <div className="flex items-center justify-between text-xs font-bold text-amber-900">
-                      <span>Enter Quantity Physically Located (Expected: {caseData.qty})</span>
-                      <button
-                        onClick={() => setActiveSubAction(null)}
-                        className="text-slate-400 hover:text-slate-700 text-xs font-semibold cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={caseData.qty > 1 ? caseData.qty - 1 : 1}
-                        value={partialCount}
-                        onChange={(e) => setPartialCount(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-20 px-3 py-1.5 text-sm font-bold font-mono bg-white border border-slate-300 rounded-lg text-slate-900"
-                      />
-                      <button
-                        id="btn-confirm-partial"
-                        onClick={() => handleVerifyOutcome('PARTIALLY_FOUND', partialCount)}
-                        className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                      >
-                        Confirm Partial Pick
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {activeSubAction === 'WRONG_QUANTITY' && (
-                  <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-xl space-y-2.5 animate-in fade-in">
-                    <div className="flex items-center justify-between text-xs font-bold text-amber-900">
-                      <span>Total Quantity Physically Observed (Expected: {caseData.qty})</span>
-                      <button
-                        onClick={() => setActiveSubAction(null)}
-                        className="text-slate-400 hover:text-slate-700 text-xs font-semibold cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="number"
-                        min={0}
-                        max={999}
-                        value={wrongCount}
-                        onChange={(e) => setWrongCount(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-20 px-3 py-1.5 text-sm font-bold font-mono bg-white border border-slate-300 rounded-lg text-slate-900"
-                      />
-                      <button
-                        id="btn-confirm-wrong-qty"
-                        onClick={() => handleVerifyOutcome('WRONG_QUANTITY', wrongCount)}
-                        className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                      >
-                        Log Count Discrepancy
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {activeSubAction === 'DAMAGED' && (
-                  <div className="p-3.5 bg-rose-50/90 border border-rose-200 rounded-xl space-y-2.5 animate-in fade-in">
-                    <div className="flex items-center justify-between text-xs font-bold text-rose-900">
-                      <span>Report Damaged Inventory</span>
-                      <button
-                        onClick={() => setActiveSubAction(null)}
-                        className="text-slate-400 hover:text-slate-700 text-xs font-semibold cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={damageNotes}
-                      onChange={(e) => setDamageNotes(e.target.value)}
-                      placeholder="Brief note on item condition..."
-                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900"
-                    />
-                    <button
-                      id="btn-confirm-damaged"
-                      onClick={() => handleVerifyOutcome('DAMAGED', 0, damageNotes)}
-                      className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                    >
-                      Record Damaged Stock & Escalate
-                    </button>
-                  </div>
-                )}
-
-                {/* Exception Options Toolbar */}
-                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-                  <button
-                    id="btn-toggle-partial"
-                    onClick={() =>
-                      setActiveSubAction((prev) => (prev === 'PARTIALLY_FOUND' ? null : 'PARTIALLY_FOUND'))
-                    }
-                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors cursor-pointer border ${
-                      activeSubAction === 'PARTIALLY_FOUND'
-                        ? 'bg-amber-100 text-amber-900 border-amber-300'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    Partially Found
-                  </button>
-
-                  <button
-                    id="btn-toggle-wrong-qty"
-                    onClick={() =>
-                      setActiveSubAction((prev) => (prev === 'WRONG_QUANTITY' ? null : 'WRONG_QUANTITY'))
-                    }
-                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors cursor-pointer border ${
-                      activeSubAction === 'WRONG_QUANTITY'
-                        ? 'bg-amber-100 text-amber-900 border-amber-300'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    Wrong Quantity
-                  </button>
-
-                  <button
-                    id="btn-toggle-damaged"
-                    onClick={() =>
-                      setActiveSubAction((prev) => (prev === 'DAMAGED' ? null : 'DAMAGED'))
-                    }
-                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors cursor-pointer border ${
-                      activeSubAction === 'DAMAGED'
-                        ? 'bg-rose-100 text-rose-900 border-rose-300'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    Damaged
-                  </button>
-
-                  <button
-                    id="btn-direct-escalate"
-                    onClick={() => handleVerifyOutcome('ESCALATE', 0, 'Floor picker manual escalation')}
-                    className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer"
-                  >
-                    Escalate
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ==================== SCENARIO 2: CONFLICT ==================== */}
-          {(activeScenario === 'conflict' ||
-            investigationResult?.evaluation.confidenceState === 'CONFLICTING') && (
-            <div className="bg-white border-2 border-rose-300 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-              {/* Header */}
-              <div className="space-y-2">
-                <div>
-                  <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                    <span>CONFLICTING INFORMATION</span>
-                  </span>
-                </div>
-                <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">
-                  NO RELIABLE LOCATION
-                </h2>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600">
-                  We found different information. No reliable location can be recommended.
-                </p>
-              </div>
-
-              {/* Compact Combined Section: WHAT WE FOUND */}
-              <div className="space-y-4 pt-3 border-t border-slate-200">
-                <div className="text-xs font-black text-slate-400 tracking-wider uppercase">
-                  WHAT WE FOUND
-                </div>
-
-                {/* SCANNER EVIDENCE */}
-                <div className="space-y-1">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    SCANNER EVIDENCE
-                  </div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {investigationResult?.evaluation.scannerEvidenceSummary ||
-                      `Last recorded at B07 · 11:40 AM`}
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    Put-away &bull; Qty {caseData.qty}
-                  </p>
-                </div>
-
-                {/* CAMERA EVIDENCE */}
-                <div className="space-y-3 pt-2 border-t border-slate-100">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    CAMERA EVIDENCE
-                  </div>
-                  {currentCameraEvents.length === 0 ? (
-                    <p className="text-sm font-semibold text-slate-800">
-                      {investigationResult?.evaluation.cameraEvidenceSummary || 'No useful footage found.'}
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {currentCameraEvents.map((evt, idx) => {
-                        const formattedDateTime = evt.date
-                          ? (evt.timeRange ? `${evt.date} · ${evt.timeRange}` : `${evt.date} · ${evt.exactTime}`)
-                          : (evt.timeRange || evt.exactTime);
-
-                        const cameraDisplayName = evt.camera
-                          .replace('AISLE-3-CAM', 'Aisle 3')
-                          .replace('A12-CAM', 'Bay A12')
-                          .replace('B07-CAM', 'Bay B07')
-                          .replace('-CAM', '');
-
-                        return (
-                          <div
-                            key={idx}
-                            id={`camera-conflict-event-${idx}`}
-                            className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5"
-                          >
-                            <p className="text-sm font-semibold text-slate-900">
-                              {evt.eventDescription || 'Movement appears toward C03.'}
-                            </p>
-
-                            <div className="space-y-0.5">
-                              <div className="text-xs font-bold font-mono text-slate-900">
-                                {formattedDateTime}
-                              </div>
-                              <div className="text-xs text-slate-600">
-                                Camera: <span className="font-semibold text-slate-800">{cameraDisplayName}</span>
-                              </div>
-                            </div>
-
-                            <div className="pt-0.5">
-                              <button
-                                id={`btn-view-video-conflict-${idx}`}
-                                onClick={() => openCameraPlayer(evt)}
-                                className="py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl inline-flex items-center space-x-2 transition-colors cursor-pointer shadow-2xs"
-                              >
-                                <Play className="w-3.5 h-3.5 fill-current text-amber-400" />
-                                <span>▶ VIEW VIDEO</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* WHY NO RECOMMENDATION? */}
-                <div className="space-y-1 pt-2 border-t border-slate-100">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    WHY NO RECOMMENDATION?
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {investigationResult?.evaluation.whyRationale ||
-                      `The scanner record shows the item was last recorded at B07, but camera footage indicates activity moving toward C03.`}
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Directive & Send for Review */}
-              <div className="pt-2 border-t border-slate-200 space-y-3">
-                <div className="text-xs text-slate-400 font-medium">Therefore:</div>
-                <p className="text-sm font-bold text-slate-900">
-                  Do not guess. Send the case directly for warehouse supervisor review.
-                </p>
+                <input
+                  type="text"
+                  value={escalationReason}
+                  onChange={(e) => setEscalationReason(e.target.value)}
+                  className="w-full px-2 py-1 border border-rose-300 rounded text-xs bg-white text-slate-800"
+                />
                 <button
-                  id="btn-send-review-conflict"
-                  onClick={handleNotFound}
-                  className="w-full py-3.5 px-5 bg-slate-900 hover:bg-slate-800 text-white font-black text-sm rounded-xl flex items-center justify-center space-x-2 shadow-xs transition-colors cursor-pointer"
+                  onClick={() => handleSupervisorConfirm('NOT_FOUND', undefined, escalationReason)}
+                  className="w-full py-1 bg-rose-700 text-white rounded text-xs font-semibold cursor-pointer"
                 >
-                  <span>SEND FOR REVIEW &rarr;</span>
+                  Confirm Escalation
                 </button>
-              </div>
-            </div>
-          )}
-
-          {/* ==================== SCENARIO 3: NO CAMERA ==================== */}
-          {(activeScenario === 'no-camera' ||
-            (investigationResult?.evaluation.confidenceState === 'NO_CAMERA' &&
-              activeScenario !== 'conflict')) && (
-            <div className="bg-white border-2 border-slate-300 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-              {/* Header */}
-              <div className="space-y-2">
-                <div>
-                  <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                    <span>NO FOOTAGE AVAILABLE</span>
-                  </span>
-                </div>
-                <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">
-                  NO LOCATION RECOMMENDED
-                </h2>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600">
-                  We couldn't identify a reliable next location.
-                </p>
-              </div>
-
-              {/* Compact Combined Section: WHAT WE FOUND */}
-              <div className="space-y-4 pt-3 border-t border-slate-200">
-                <div className="text-xs font-black text-slate-400 tracking-wider uppercase">
-                  WHAT WE FOUND
-                </div>
-
-                {/* SCANNER EVIDENCE */}
-                <div className="space-y-1">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    SCANNER EVIDENCE
-                  </div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {investigationResult?.evaluation.scannerEvidenceSummary ||
-                      `Last recorded at ${caseData.expectedLocation || 'A12'} · 2:34 PM`}
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    Put-away &bull; Qty {caseData.qty}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    No movement was recorded after this.
-                  </p>
-                </div>
-
-                {/* CAMERA EVIDENCE */}
-                <div className="space-y-1 pt-2 border-t border-slate-100">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    CAMERA EVIDENCE
-                  </div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {investigationResult?.evaluation.cameraEvidenceSummary ||
-                      'No useful footage found.'}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Overhead cameras had no clear visual record of this item departing {caseData.expectedLocation || 'A12'}.
-                  </p>
-                </div>
-
-                {/* WHY NO RECOMMENDATION? */}
-                <div className="space-y-1 pt-2 border-t border-slate-100">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    WHY NO RECOMMENDATION?
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {investigationResult?.evaluation.whyRationale ||
-                      `Scanner shows the item was placed at ${caseData.expectedLocation || 'A12'}, but camera footage is unavailable to verify any further movement.`}
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Directive & Send for Review */}
-              <div className="pt-2 border-t border-slate-200 space-y-3">
-                <div className="text-xs text-slate-400 font-medium">Therefore:</div>
-                <p className="text-sm font-bold text-slate-900">
-                  Send the case for warehouse review.
-                </p>
-                <button
-                  id="btn-send-review-no-camera"
-                  onClick={handleNotFound}
-                  className="w-full py-3.5 px-5 bg-slate-900 hover:bg-slate-800 text-white font-black text-sm rounded-xl flex items-center justify-center space-x-2 shadow-xs transition-colors cursor-pointer"
-                >
-                  <span>SEND FOR REVIEW &rarr;</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* SCREEN 4A: RESOLVED                                                      */}
-      {/* ========================================================================= */}
-      {currentStep === 'result-found' && (
-        <div className="bg-white border-2 border-emerald-500 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-              <CheckCircle2 className="w-7 h-7 text-emerald-600" />
-            </div>
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                ✓ ITEM FOUND
-              </h2>
-              <p className="text-sm font-semibold text-emerald-800 mt-0.5">
-                Found at B07
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-950 font-medium">
-            Case completed.
-          </div>
-
-          <div className="pt-2">
-            <button
-              id="btn-return-open-cases"
-              onClick={onBackToOpenCases}
-              className="w-full sm:w-auto py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center space-x-2 transition-colors cursor-pointer"
-            >
-              <span>BACK TO OPEN CASES &rarr;</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* SCREEN 4B: ESCALATED / DISCREPANCY / NOT FOUND                            */}
-      {/* ========================================================================= */}
-      {currentStep === 'result-not-found' && (
-        <div className="bg-white border border-slate-300 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex items-center space-x-3">
-            <div
-              className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                lastOutcome === 'PARTIALLY_FOUND' ||
-                lastOutcome === 'WRONG_QUANTITY' ||
-                lastOutcome === 'DAMAGED'
-                  ? 'bg-amber-100 text-amber-700'
-                  : 'bg-rose-100 text-rose-700'
-              }`}
-            >
-              <AlertTriangle className="w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {lastOutcome === 'PARTIALLY_FOUND'
-                  ? 'PARTIAL PICK RECORDED'
-                  : lastOutcome === 'WRONG_QUANTITY'
-                  ? 'COUNT DISCREPANCY RECORDED'
-                  : lastOutcome === 'DAMAGED'
-                  ? 'DAMAGED INVENTORY LOGGED'
-                  : lastOutcome === 'ESCALATE'
-                  ? 'ESCALATED TO SUPERVISOR'
-                  : activeScenario === 'conflict' || activeScenario === 'no-camera'
-                  ? 'CASE SENT FOR REVIEW'
-                  : 'ITEM STILL NOT FOUND'}
-              </h2>
-              <p className="text-xs sm:text-sm font-semibold text-slate-600 mt-0.5">
-                {lastOutcome === 'PARTIALLY_FOUND'
-                  ? `Located ${partialCount} of ${caseData.qty} units at recommended location.`
-                  : lastOutcome === 'WRONG_QUANTITY'
-                  ? `Physical count was ${wrongCount} units (expected ${caseData.qty}).`
-                  : lastOutcome === 'DAMAGED'
-                  ? 'Item recorded as damaged and unusable.'
-                  : lastOutcome === 'ESCALATE'
-                  ? 'Manual escalation requested for warehouse supervisor review.'
-                  : 'Item physically absent at recommended location.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1 text-xs text-slate-700">
-            <p className="font-semibold text-slate-900">
-              {lastOutcome === 'PARTIALLY_FOUND' ||
-              lastOutcome === 'WRONG_QUANTITY' ||
-              lastOutcome === 'DAMAGED'
-                ? 'An operational discrepancy has been logged and flagged for supervisor review.'
-                : activeScenario === 'conflict'
-                ? 'Conflicting information was detected between warehouse systems.'
-                : activeScenario === 'no-camera'
-                ? "We couldn't identify another reliable location from camera footage."
-                : "We couldn't identify another reliable location."}
-            </p>
-            <p className="text-slate-600">
-              {lastOutcome === 'PARTIALLY_FOUND' ||
-              lastOutcome === 'WRONG_QUANTITY' ||
-              lastOutcome === 'DAMAGED'
-                ? 'Inventory records flagged for recount and bin audit.'
-                : 'Case sent for warehouse review.'}
-            </p>
-
-            {/* Clean Outbound Email Dispatch Status */}
-            {emailNotificationResult && (
-              <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center space-x-2 text-[11px]">
-                <Mail className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                {emailNotificationResult.success ? (
-                  <span className="text-emerald-700 font-semibold">
-                    Outbound escalation notification dispatched via Gmail to {emailNotificationResult.recipient}
-                  </span>
-                ) : (
-                  <span className="text-slate-500 font-medium">
-                    Outbound alert logged: {emailNotificationResult.recipient} ({emailNotificationResult.error || 'Pending Authorization'})
-                  </span>
-                )}
               </div>
             )}
           </div>
-
-          <div className="pt-2">
-            <button
-              id="btn-return-open-cases-escalated"
-              onClick={onBackToOpenCases}
-              className="w-full sm:w-auto py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center space-x-2 transition-colors cursor-pointer"
-            >
-              <span>BACK TO OPEN CASES &rarr;</span>
-            </button>
-          </div>
         </div>
-      )}
-
-      {/* Video Player Modal */}
-      <CameraVideoPlayerModal
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        footage={selectedFootage}
-        allFootage={cameraFootageList}
-        onSelectNextFootage={(item) => setSelectedFootage(item)}
-      />
+      </div>
     </div>
   );
 };
