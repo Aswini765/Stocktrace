@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS scanner_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Camera Observation Metadata (Tier 2 & 3 Evidence)
+-- Camera Observation Metadata (Tier 2 Evidence)
 CREATE TABLE IF NOT EXISTS camera_events (
     event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     camera_id VARCHAR(64) NOT NULL,

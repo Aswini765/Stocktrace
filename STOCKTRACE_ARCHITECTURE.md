@@ -383,7 +383,7 @@ Total Cases: 36 | Passed: 36 | Failed: 0 | Pass Rate: 100.0%
 | **E7** | Rationale | Supervisor queries causal justification | Returns corroborated scanner + camera timeline | **PASS** |
 | **E8** | Guardrail | LLM hallucination / unsupported candidate | Strip invalid candidate; trigger safe refusal | **PASS** |
 | **E10** | Vector SOP | Query unmatched by approved SOPs | Return exact refusal: "No approved procedure..." | **PASS** |
-| **E13** | Cost Guardrail | Low-value item (₹850) requesting Tier 3 compute | Block Tier 3; enforce ₹5,000 threshold | **PASS** |
+| **E13** | Tier Progression | Inconclusive Tier 1 scanner evidence | Progresses to Tier 2 camera evidence evaluation | **PASS** |
 | **E15** | ROI Dashboard | Manager financial model calculation | Net benefit verified with contribution margin | **PASS** |
 | **E25** | Picker Flow | Initial screen opens without preassigned task | Report Missing Item button initiates flow | **PASS** |
 | **E28** | Idempotency | Duplicate submission of identical report | Returns cached task; zero duplicate rows | **PASS** |
@@ -454,20 +454,18 @@ The `traceId` is displayed on the picker's WhatsApp card and preserved in the au
 
 ## 14. TOKEN USAGE & UNIT COST ECONOMICS
 
-StockTrace incorporates a strict cost-aware evidence escalation hierarchy:
+StockTrace incorporates a strict cost-aware 2-tier evidence escalation hierarchy:
 
 ```mermaid
-pie title Investigation Cost Breakdown
-    "Tier 1: Relational Scans (₹0.00)" : 70
-    "Grounded Response LLM (₹0.03)" : 20
-    "Vector RAG SOP Search (₹0.01)" : 5
-    "Tier 3: AI Video Analysis (₹120.00 - Conditional)" : 5
+pie title Investigation Resolution Breakdown
+    "Tier 1: Scanner & Transactions (₹0.00)" : 70
+    "Tier 2: Targeted Camera Evidence (₹0.00)" : 20
+    "Insufficient / Escalated Review" : 10
 ```
 
-1. **Tier 1 (Transaction & Scanner Data):** Cost: **₹0.00**. Deterministic relational indexing resolves ~70% of displaced inventory cases at zero marginal inference cost.
-2. **Tier 2 (Stationary Camera Metadata):** Cost: **₹0.00**. Optical barcode reads already captured at conveyor/zone checkpoints.
-3. **Tier 3 (AI Video Frame Inspection):** Cost: **~₹120.00 / run**. Triggered **only** when item valuation $\ge \text{₹}5,000$ and physical verification fails.
-4. **Token Economics (Gemini 2.5 Flash):**
+1. **Tier 1 (Transaction & Scanner Evidence):** Cost: **₹0.00**. Deterministic relational indexing resolves displaced inventory cases at zero marginal inference cost.
+2. **Tier 2 (Targeted Camera Evidence):** Cost: **₹0.00**. Evaluates targeted event footage (pre-recorded / simulated camera observations in demo) combined with Tier 1 evidence.
+3. **Token Economics (Gemini 2.5 Flash):**
    - Prompt: ~200 tokens ($\approx \text{₹}0.02$)
    - Completion: ~50 tokens ($\approx \text{₹}0.01$)
    - **Average Investigation Cost:** **₹0.03 to ₹0.05 per standard case**.
@@ -485,7 +483,7 @@ The application provides 8 interactive demo scenarios covering the entire operat
 5. **Scenario 5 (Stale Evidence):** Scanner movement occurred 28 hours ago ($>24\text{h}$ threshold). Flagged as `LOW_STALE` with mandatory verification notice.
 6. **Scenario 6 (Quantity Shortage):** 6 items found when 10 were required. Shortage discrepancy recorded for supervisor reconciliation without modifying base inventory.
 7. **Scenario 7 (Damaged Stock):** Items found damaged. Investigation task marked damaged; routed to QA/quarantine workflow.
-8. **Scenario 8 (High-Value Item Tier 3 Escalation):** High-value item (₹18,000) triggers conditional simulated Tier 3 video computer-vision analysis.
+8. **Scenario 8 (Targeted Camera Evidence - Tier 2):** Tier 1 scanner records inconclusive. Evaluates Tier 2 targeted camera footage (CAM-PLC-09) observing technician trolley moving carton to Bay E14.
 
 ---
 

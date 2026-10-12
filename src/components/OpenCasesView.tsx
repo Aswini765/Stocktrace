@@ -47,8 +47,6 @@ export const OpenCasesView: React.FC<OpenCasesViewProps> = ({
           if (c.evidenceTierUsed !== 'TIER_1_SCANNER_WMS' && c.evidenceTierUsed !== 'TRANSACTION_SCANNER') return false;
         } else if (tierFilter === 'tier-2') {
           if (c.evidenceTierUsed !== 'TIER_2_TARGETED_CAMERA') return false;
-        } else if (tierFilter === 'tier-3') {
-          if (c.evidenceTierUsed !== 'TIER_3_CONDITIONAL_AI') return false;
         } else if (tierFilter === 'insufficient') {
           if (c.evidenceTierUsed !== 'INSUFFICIENT' && c.evidenceTierUsed !== 'CONFLICTING' && c.evidenceTierUsed !== 'STALE') return false;
         }
@@ -132,7 +130,6 @@ export const OpenCasesView: React.FC<OpenCasesViewProps> = ({
             <option value="all">Tier: All Evidence Tiers</option>
             <option value="tier-1">Tier 1: Transaction &amp; Scanner</option>
             <option value="tier-2">Tier 2: Targeted Camera</option>
-            <option value="tier-3">Tier 3: Conditional AI Video</option>
             <option value="insufficient">Insufficient / Conflicting / Stale</option>
           </select>
 
@@ -237,11 +234,7 @@ export const OpenCasesView: React.FC<OpenCasesViewProps> = ({
 
                       {/* Evidence Tier */}
                       <td className="py-3 px-3.5">
-                        {c.evidenceTierUsed === 'TIER_3_CONDITIONAL_AI' ? (
-                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
-                            <span>Tier 3 (AI Video)</span>
-                          </span>
-                        ) : c.evidenceTierUsed === 'TIER_2_TARGETED_CAMERA' ? (
+                        {c.evidenceTierUsed === 'TIER_2_TARGETED_CAMERA' ? (
                           <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
                             <span>Tier 2 (Camera)</span>
                           </span>

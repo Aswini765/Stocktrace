@@ -57,12 +57,6 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       limitation: 'Camera viewing angle does not display inner bin contents; physical confirmation mandatory.',
       status: 'AVAILABLE',
     },
-    tier3AiAnalysis: {
-      eligible: false,
-      ineligibilityReason: 'Tier 1 & Tier 2 evidence are conclusive. Tier 3 AI video analysis not required.',
-      status: 'NOT_RUN',
-      estimatedCostInr: 120,
-    },
     auditTrail: [
       {
         id: 'AUD-1042-1',
@@ -118,12 +112,6 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       limitation: 'Camera does not show high bay upper tiers.',
       status: 'AVAILABLE',
     },
-    tier3AiAnalysis: {
-      eligible: false,
-      ineligibilityReason: 'Blocked by Cost Guardrail: Item value (₹850) is below the ₹5,000 threshold for Tier 3 AI video compute (~₹120/case).',
-      status: 'BLOCKED_BY_GUARDRAIL',
-      estimatedCostInr: 120,
-    },
     auditTrail: [
       {
         id: 'AUD-2081-1',
@@ -143,9 +131,10 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       {
         id: 'AUD-2081-3',
         timestamp: '13:15:06',
-        actor: 'Safety Guardrail',
-        action: 'TIER_3_BLOCKED',
-        details: 'Cost guardrail blocked Tier 3 video processing for low-value SKU (₹850 < ₹5,000).',
+        actor: 'StockTrace Evidence Engine',
+        action: 'TIER_2_EVALUATED',
+        details: 'Evaluated targeted camera CAM-02-AISLE-2. No movement observed near B07 during last 60 minutes.',
+        tierUsed: 'INSUFFICIENT',
       },
     ],
   },
@@ -177,12 +166,6 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       observation: 'Tote marked with SKU batch was visually seen moving toward Aisle 5 (C19).',
       limitation: 'Conflicts with Handheld Scanner 03 record indicating transfer toward Bay B07.',
       status: 'AVAILABLE',
-    },
-    tier3AiAnalysis: {
-      eligible: false,
-      ineligibilityReason: 'Conflicting operational data requires human supervisor physical inspection rather than automated AI processing.',
-      status: 'NOT_RUN',
-      estimatedCostInr: 120,
     },
     auditTrail: [
       {
@@ -233,12 +216,6 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       limitation: 'Inner pouch serial barcode obscured from fixed ceiling angle.',
       status: 'AVAILABLE',
     },
-    tier3AiAnalysis: {
-      eligible: true,
-      status: 'NOT_RUN',
-      triggeredReason: 'High inventory value (₹12,500/unit) exceeds ₹5,000 threshold. Available for conditional escalation if physical check is inconclusive.',
-      estimatedCostInr: 120,
-    },
     auditTrail: [
       {
         id: 'AUD-4099-1',
@@ -288,12 +265,6 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       limitation: 'CCTV footage older than 24 hours. Does not reflect current shift movements.',
       status: 'AVAILABLE',
     },
-    tier3AiAnalysis: {
-      eligible: false,
-      ineligibilityReason: 'Stale baseline data (> 24 hours). AI video analysis cannot reconstruct historical shifts.',
-      status: 'BLOCKED_BY_GUARDRAIL',
-      estimatedCostInr: 120,
-    },
     auditTrail: [
       {
         id: 'AUD-5012-1',
@@ -342,12 +313,6 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       observation: 'Camera stream disconnected or blind spot in high-rack overhang.',
       limitation: 'No visual evidence available. Resolution relies strictly on Tier 1 scanner transactions.',
       status: 'BLIND_SPOT',
-    },
-    tier3AiAnalysis: {
-      eligible: false,
-      ineligibilityReason: 'Visual camera input unavailable due to blind spot.',
-      status: 'NOT_RUN',
-      estimatedCostInr: 120,
     },
     auditTrail: [
       {
@@ -542,8 +507,8 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
     movementPath: 'E10 → Maintenance Bay → E14',
     itemValue: 18000,
     orderValue: 36000,
-    evidenceTierUsed: 'TIER_3_CONDITIONAL_AI',
-    tierResolutionNote: 'High value (₹18,000) and repeated failed checks justified Tier 3 conditional AI video analysis.',
+    evidenceTierUsed: 'TIER_2_TARGETED_CAMERA',
+    tierResolutionNote: 'Targeted camera evidence at CAM-PLC-09 observed technician transport trolley moving PLC carton into Bay E14.',
     landmarkHint: 'Automation engineering bay E14, locked cage',
     cameraEvidence: {
       cameraId: 'CAM-PLC-09',
@@ -551,16 +516,6 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       observation: 'Technician transport trolley observed moving PLC carton into Bay E14.',
       limitation: 'Viewing angle obstructed by staging ladder.',
       status: 'AVAILABLE',
-    },
-    tier3AiAnalysis: {
-      eligible: true,
-      status: 'COMPLETED',
-      triggeredReason: 'High item value (₹18,000 >= ₹5,000 threshold) and critical customer delivery priority.',
-      estimatedCostInr: 120,
-      visualConfidence: 94,
-      detectedLocation: 'E14',
-      analysisSummary: 'Frame 05:58:32: Multi-frame visual recognition confirmed manufacturer seal match for SKU-9800 placed into Bay E14 bottom shelf.',
-      timestamp: '06:08',
     },
     auditTrail: [
       {
@@ -573,10 +528,10 @@ export const INITIAL_FAILED_CASES: FailedPickCase[] = [
       {
         id: 'AUD-9800-2',
         timestamp: '06:06:00',
-        actor: 'StockTrace Supervisor',
-        action: 'TIER_3_ANALYSIS_TRIGGERED',
-        details: 'High-value threshold satisfied (₹18,000 >= ₹5,000). Computed prototype AI video frame analysis.',
-        tierUsed: 'TIER_3_CONDITIONAL_AI',
+        actor: 'StockTrace Evidence Engine',
+        action: 'TIER_2_CAMERA_EVALUATED',
+        details: 'Targeted camera CAM-PLC-09 observed technician transport trolley moving carton into Bay E14.',
+        tierUsed: 'TIER_2_TARGETED_CAMERA',
       },
     ],
   },
@@ -856,10 +811,10 @@ export const DATA_SOURCES: DataSourceItem[] = [
   },
   {
     id: 'ds-cameras',
-    name: 'Targeted CCTV Camera Streams (Tier 2 & 3)',
+    name: 'Targeted CCTV Camera Streams (Tier 2)',
     status: 'Connected',
-    source: 'Warehouse Fixed Cameras & AI Feeds',
-    details: 'Targeted event cameras with simulated CCTV timelines and prototype frame analysis.',
+    source: 'Warehouse Fixed Cameras & Pre-recorded Clips',
+    details: 'Targeted event cameras with simulated CCTV timelines and placement observations.',
     lastSync: 'Real-time',
     recordCount: '8 aisle cameras online (1 blind spot)',
   },

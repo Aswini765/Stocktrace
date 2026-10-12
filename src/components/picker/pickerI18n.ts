@@ -309,16 +309,6 @@ export const PICKER_I18N = {
       hi: 'सुपरवाइजर को भेजें',
       kn: 'ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸಿ',
     },
-    runTier3Ai: {
-      en: 'Run Simulated Tier 3 AI Video Analysis (~₹120)',
-      hi: 'सिमुलेटेड टियर 3 AI वीडियो विश्लेषण चलाएं (~₹120)',
-      kn: 'ಸಿಮ್ಯುಲೇಟೆಡ್ ಶ್ರೇಣಿ 3 AI ವೀಡಿಯೊ ವಿಶ್ಲೇಷಣೆ ಚಲಾಯಿಸಿ (~₹120)',
-    },
-    runningTier3: {
-      en: 'Processing CCTV Video Frames...',
-      hi: 'सीसीटीवी वीडियो फ्रेम प्रोसेस हो रहे हैं...',
-      kn: 'ಸಿಸಿಟಿವಿ ವೀಡಿಯೊ ಫ್ರೇಮ್‌ಗಳನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ...',
-    },
     reset: {
       en: 'Reset',
       hi: 'रीसेट',
@@ -426,16 +416,15 @@ export const PICKER_I18N = {
       kn: `${staleLoc} ಗೆ ಚಲನೆಯ ದಾಖಲೆ ಲಭ್ಯವಿದೆ, ಆದರೆ ಇದು ${hoursOld} ಗಂಟೆಗಳಷ್ಟು ಹಳೆಯದಾಗಿದೆ (2 ಗಂಟೆಗಳ ಮಿತಿಗಿಂತ ಹೆಚ್ಚು). ಇದು ಹಳೆಯ ಪುರಾವೆಯಾಗಿದೆ. ದಯವಿಟ್ಟು ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸಿ.`,
     }),
 
-    recommendationHighValue: (itemValue: number, costInr: number = 120): LocalizedString => ({
-      en: `High-value inventory item (₹${itemValue.toLocaleString('en-IN')} exceeds the ₹5,000 threshold). Tier 1 scanner evidence is inconclusive. Eligible for simulated Tier 3 AI video-analysis workflow (~₹${costInr} illustrative cost).`,
-      hi: `उच्च मूल्य वाली वस्तु (₹${itemValue.toLocaleString('en-IN')} ₹5,000 की सीमा से अधिक)। टियर 1 स्कैनर डेटा अनिर्णायक है। सिमुलेटेड टियर 3 AI वीडियो विश्लेषण (~₹${costInr} अनुमानित लागत) के लिए पात्र है।`,
-      kn: `ಹೆಚ್ಚಿನ ಮೌಲ್ಯದ ದಾಸ್ತಾನು ವಸ್ತು (₹${itemValue.toLocaleString('en-IN')} ₹5,000 ಮಿತಿಯನ್ನು ಮೀರಿದೆ). ಶ್ರೇಣಿ 1 ಸ್ಕ್ಯಾನರ್ ಡೇಟಾ ಅನಿರ್ಣಾಯಕವಾಗಿದೆ. ಸಿಮ್ಯುಲೇಟೆಡ್ ಶ್ರೇಣಿ 3 AI ವೀಡಿಯೊ ವಿಶ್ಲೇಷಣೆಗೆ (~₹${costInr} ಅಂದಾಜು ವೆಚ್ಚ) ಅರ್ಹವಾಗಿದೆ.`,
-    }),
-
-    tier3AnalysisCompleted: (detectedLoc: string): LocalizedString => ({
-      en: `Simulated Tier 3 AI video analysis completed: Multi-frame visual recognition confirmed manufacturer packaging placed into Bay ${detectedLoc}. Illustrative compute cost ₹120 logged.`,
-      hi: `सिमुलेटेड टियर 3 AI वीडियो विश्लेषण पूर्ण: मल्टी-फ्रेम विजुअल पहचान ने बे ${detectedLoc} में रखे गए पैकेजिंग की पुष्टि की। ₹120 लागत दर्ज की गई।`,
-      kn: `ಸಿಮ್ಯುಲೇಟೆಡ್ ಶ್ರೇಣಿ 3 AI ವೀಡಿಯೊ ವಿಶ್ಲೇಷಣೆ ಪೂರ್ಣಗೊಂಡಿದೆ: ಬೇ ${detectedLoc} ನಲ್ಲಿ ಪ್ಯಾಕೇಜಿಂಗ್ ಇರುವುದನ್ನು ದೃಢೀಕರಿಸಲಾಗಿದೆ. ₹120 ವೆಚ್ಚ ದಾಖಲಾಗಿದೆ.`,
+    recommendationCamera: (
+      cameraName: string,
+      time: string,
+      toBin: string,
+      observation: string
+    ): LocalizedString => ({
+      en: `Tier 1 scanner records were inconclusive. Evaluating Tier 2 camera evidence (${cameraName} at ${time}): observed ${observation}. Suggested location is Bay ${toBin}. Note: Camera evidence is simulated / pre-recorded; physical verification is required.`,
+      hi: `टियर 1 स्कैनर रिकॉर्ड अनिर्णायक थे। टियर 2 कैमरा साक्ष्य का मूल्यांकन (${time} पर ${cameraName}): देखा गया कि ${observation}। सुझाया गया स्थान बे ${toBin} है। नोट: कैमरा साक्ष्य सिमुलेटेड / प्री-रिकॉर्डेड है; भौतिक सत्यापन आवश्यक है।`,
+      kn: `ಶ್ರೇಣಿ 1 ಸ್ಕ್ಯಾನರ್ ದಾಖಲೆಗಳು ಅನಿರ್ಣಾಯಕವಾಗಿದ್ದವು. ಶ್ರೇಣಿ 2 ಕ್ಯಾಮೆರಾ ಪುರಾವೆಯ ಮೌಲ್ಯಮಾಪನ (${time} ರಂದು ${cameraName}): ${observation} ಕಂಡುಬಂದಿದೆ. ಸೂಚಿಸಲಾದ ಸ್ಥಳ ಬೇ ${toBin}. ಗಮನಿಸಿ: ಕ್ಯಾಮೆರಾ ಪುರಾವೆ ಸಿಮ್ಯುಲೇಟ್ / ಪೂರ್ವ-ರೆಕಾರ್ಡ್ ಮಾಡಲಾಗಿದೆ; ಭೌತಿಕ ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ.`,
     }),
 
     pickerFound: (loc: string): LocalizedString => ({

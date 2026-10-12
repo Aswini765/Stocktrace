@@ -12,7 +12,7 @@ import {
   ShieldAlert,
   Loader2,
   AlertCircle,
-  Cpu,
+  Video,
   Search,
   ExternalLink,
   Send,
@@ -72,8 +72,7 @@ interface ConversationMessage {
     | 'REC_STALE'
     | 'REC_LESS_QTY'
     | 'REC_DAMAGED'
-    | 'REC_HIGH_VALUE'
-    | 'TIER3_COMPLETED'
+    | 'REC_CAMERA'
     | 'PICKER_FOUND'
     | 'PICKER_NOT_FOUND_RECOMMENDED'
     | 'PICKER_LESS_QTY'
@@ -93,10 +92,11 @@ interface ConversationMessage {
     scannerTime?: string;
     cameraLoc?: string;
     cameraTime?: string;
+    cameraName?: string;
+    observation?: string;
+    limitation?: string;
     staleLoc?: string;
     hoursOld?: number;
-    itemValue?: number;
-    costInr?: number;
     foundQty?: number;
     totalQty?: number;
     damageReason?: string;
@@ -168,10 +168,6 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [recommendedBin, setRecommendedBin] = useState<string | null>(null);
 
-  // Tier 3 AI state
-  const [isTier3Running, setIsTier3Running] = useState<boolean>(false);
-  const [tier3Completed, setTier3Completed] = useState<boolean>(false);
-
   // Drawers / Discrepancy Modals
   const [showLessQtyDrawer, setShowLessQtyDrawer] = useState<boolean>(false);
   const [showDamageDrawer, setShowDamageDrawer] = useState<boolean>(false);
@@ -221,8 +217,6 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
     setShowLessQtyDrawer(false);
     setShowDamageDrawer(false);
     setRecommendedBin(null);
-    setIsTier3Running(false);
-    setTier3Completed(false);
     setMessages([]);
     setAssignedTask(null);
     setStage('welcome');
@@ -252,7 +246,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, stage, isTier3Running, showLessQtyDrawer, showDamageDrawer]);
+  }, [messages, stage, showLessQtyDrawer, showDamageDrawer]);
 
   // Keep speech text in sync with language switches
   useEffect(() => {
@@ -589,22 +583,31 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
             setRecommendedBin('D04');
             setStage('recommendation_active');
             setActiveSpeechText(PICKER_I18N.messages.recommendationStale('D04', 28)[selectedLang]);
-          } else if (outcomeType === 'HIGH_VALUE_TIER3') {
-            // Scenario 8: High-Value Exception (Simulated Tier 3 AI)
-            const highValMsg: ConversationMessage = {
-              id: `msg-sys-hv-${Date.now()}`,
+          } else if (outcomeType === 'TIER_2_CAMERA') {
+            // Scenario 8: Targeted Camera Evidence (Tier 2)
+            const camMsg: ConversationMessage = {
+              id: `msg-sys-cam-${Date.now()}`,
               sender: 'system',
               timestamp: getCurrentTime(),
-              type: 'REC_HIGH_VALUE',
+              type: 'REC_CAMERA',
               payload: {
-                itemValue: currentScenario.itemValue || 18000,
-                costInr: 120,
+                cameraName: 'CAM-PLC-09',
+                time: '14:38',
+                toBin: 'E14',
+                observation: 'technician trolley transferring carton to Bay E14',
+                limitation: 'Simulated / pre-recorded event camera footage in demo; physical verification required',
               },
             };
-            setMessages((prev) => [...prev, highValMsg]);
+            setMessages((prev) => [...prev, camMsg]);
+            setRecommendedBin('E14');
             setStage('recommendation_active');
             setActiveSpeechText(
-              PICKER_I18N.messages.recommendationHighValue(currentScenario.itemValue || 18000, 120)[selectedLang]
+              PICKER_I18N.messages.recommendationCamera(
+                'CAM-PLC-09',
+                '14:38',
+                'E14',
+                'technician trolley transferring carton to Bay E14'
+              )[selectedLang]
             );
           } else {
             // Scenario 2: Supported Alternate Location (B07)
@@ -640,31 +643,6 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
       timeoutIdsRef.current.push(t2);
     }, 350);
     timeoutIdsRef.current.push(t1);
-  };
-
-  // Run Simulated Tier 3 AI Video Analysis for High-Value item
-  const handleRunTier3Simulated = () => {
-    setIsTier3Running(true);
-    setTimeout(() => {
-      setIsTier3Running(false);
-      setTier3Completed(true);
-      setRecommendedBin('E14');
-
-      const tier3Msg: ConversationMessage = {
-        id: `msg-sys-tier3-${Date.now()}`,
-        sender: 'system',
-        timestamp: getCurrentTime(),
-        type: 'TIER3_COMPLETED',
-        payload: {
-          toBin: 'E14',
-          costInr: 120,
-        },
-      };
-
-      setMessages((prev) => [...prev, tier3Msg]);
-      const voiceText = PICKER_I18N.messages.tier3AnalysisCompleted('E14')[selectedLang];
-      setActiveSpeechText(voiceText);
-    }, 1200);
   };
 
   // =========================================================================
@@ -905,10 +883,13 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
         return `Dispatch order requires ${p?.totalQty ?? 10} units, but ${p?.foundQty ?? 6} units were reported. A shortage discrepancy of ${p?.discrepancy ?? 4} units has been logged for supervisor review.`;
       case 'REC_DAMAGED':
         return PICKER_I18N.messages.pickerReportedDamaged(p?.damageReason || 'Cracked packaging / Broken seal')[lang];
-      case 'REC_HIGH_VALUE':
-        return PICKER_I18N.messages.recommendationHighValue(p?.itemValue || 18000, p?.costInr || 120)[lang];
-      case 'TIER3_COMPLETED':
-        return PICKER_I18N.messages.tier3AnalysisCompleted(p?.toBin || 'E14')[lang];
+      case 'REC_CAMERA':
+        return PICKER_I18N.messages.recommendationCamera(
+          p?.cameraName || 'CAM-PLC-09',
+          p?.time || '14:38',
+          p?.toBin || 'E14',
+          p?.observation || 'technician trolley transferring carton to Bay E14'
+        )[lang];
       case 'PICKER_FOUND':
         return PICKER_I18N.messages.pickerFound(p?.bin || defaultLoc)[lang];
       case 'PICKER_NOT_FOUND_RECOMMENDED':
@@ -1454,57 +1435,28 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
                         </div>
                       )}
 
-                      {/* Evidence Card: High-Value (Tier 3 AI) */}
-                      {msg.type === 'REC_HIGH_VALUE' && msg.payload && (
-                        <div className="mt-2.5 p-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-950 space-y-2">
-                          <div className="flex items-center space-x-1.5 font-bold text-purple-900 text-xs">
-                            <Cpu className="w-4 h-4 text-purple-700 shrink-0" />
-                            <span>High-Value Exception &bull; Tier 3 Eligible</span>
-                          </div>
-                          <p className="text-[11px] text-purple-900 leading-snug">
-                            Item value ₹{(msg.payload.itemValue || 18000).toLocaleString('en-IN')} meets ₹5,000 threshold.
-                            Tier 1 scanner records inconclusive. Simulated Tier 3 AI video frame analysis available (~₹120 cost).
-                          </p>
-
-                          {!tier3Completed && (
-                            <button
-                              id="btn-run-tier3-ai"
-                              onClick={handleRunTier3Simulated}
-                              disabled={isTier3Running}
-                              className="w-full mt-1 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-2xs transition-colors"
-                            >
-                              {isTier3Running ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  <span>{vLabels.runningTier3[selectedLang]}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Cpu className="w-3.5 h-3.5" />
-                                  <span>{vLabels.runTier3Ai[selectedLang]}</span>
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Evidence Card: Tier 3 Completed */}
-                      {msg.type === 'TIER3_COMPLETED' && msg.payload && (
+                      {/* Evidence Card: Targeted Camera Evidence (Tier 2) */}
+                      {msg.type === 'REC_CAMERA' && msg.payload && (
                         <div className="mt-2.5 p-3 rounded-xl bg-slate-900 text-slate-100 space-y-2 border border-slate-800">
-                          <div className="flex items-center justify-between text-[11px] font-mono text-purple-400">
-                            <span>CCTV FRAME MATCH &bull; CONFIDENCE 94%</span>
-                            <span className="text-emerald-400">ANALYSIS COMPLETE</span>
+                          <div className="flex items-center justify-between text-[11px] font-mono text-cyan-400">
+                            <span className="flex items-center space-x-1.5">
+                              <Video className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                              <span>TIER 2 &bull; TARGETED CAMERA EVIDENCE</span>
+                            </span>
+                            <span className="bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 px-1.5 py-0.5 rounded text-[10px]">
+                              SIMULATED FOOTAGE
+                            </span>
                           </div>
                           <div className="text-xs font-bold text-white flex items-center space-x-1.5">
                             <MapPin className="w-4 h-4 text-teal-400 shrink-0" />
-                            <span>Detected Location: Bay {msg.payload.toBin || 'E14'}</span>
+                            <span>Suggested Location: Bay {msg.payload.toBin || 'E14'}</span>
                           </div>
-                          <p className="text-[11px] text-slate-300">
-                            Frame 05:58:32: Visual recognition confirmed manufacturer seal match placed into Bay E14 bottom shelf.
+                          <p className="text-[11px] text-slate-300 leading-snug">
+                            Camera {msg.payload.cameraName || 'CAM-PLC-09'} ({msg.payload.time || '14:38'}):{' '}
+                            {msg.payload.observation || 'Observed technician trolley transferring carton to Bay E14.'}
                           </p>
-                          <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">
-                            Illustrative compute cost ₹120 logged. Physical confirmation mandatory.
+                          <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">
+                            Pre-recorded clip evaluated with Tier 1 records. Physical confirmation required by picker.
                           </div>
                         </div>
                       )}
@@ -1558,7 +1510,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
         {/* =================================================================== */}
         {stage === 'recommendation_active' && (
           <div className="p-3 sm:p-4 bg-white border-t border-slate-200 space-y-2">
-            {(recommendedBin || tier3Completed) && (
+            {recommendedBin && (
               <>
                 <div className="text-[11px] font-bold text-teal-800 text-center">
                   {PICKER_I18N.messages.verificationPrompt(recommendedBin || 'B07')[selectedLang]}
@@ -1611,7 +1563,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
               </>
             )}
 
-            {!recommendedBin && !tier3Completed && (
+            {!recommendedBin && (
               <div className="space-y-2">
                 <button
                   id="picker-btn-escalate-supervisor"

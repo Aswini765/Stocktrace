@@ -156,10 +156,10 @@ export class InvestigationOrchestrator {
         outcomeStatus = 'STALE_EVIDENCE';
         suggestedBin = 'D04';
         reasoning = "Movement record exceeds 2-hour freshness threshold (28 hours old). Stale evidence requires physical verification.";
-      } else if (activeScenario.expectedOutcomeType === 'HIGH_VALUE_TIER3') {
-        evidenceTierUsed = 'TIER_3_CONDITIONAL_AI';
-        costInr = 120;
-        reasoning = "Item value ₹18,000 exceeds ₹5,000 threshold. Inconclusive Tier 1 scanner evidence justifies simulated Tier 3 AI analysis (~₹120 cost).";
+      } else if (activeScenario.expectedOutcomeType === 'TIER_2_CAMERA' || (activeScenario.cameraRecords && activeScenario.cameraRecords.length > 0)) {
+        evidenceTierUsed = 'TIER_2_TARGETED_CAMERA';
+        costInr = 0;
+        reasoning = evaluation.whyRationale || "Targeted camera footage corroborated item movement.";
       }
 
       context.costEstimatesInr += costInr;

@@ -24,6 +24,7 @@ import { toolRegistry, ToolSecurityError, sanitizeInput } from '../orchestrator/
 import { querySopVector } from '../services/vector/vectorIngestion';
 import { investigationOrchestrator } from '../orchestrator/investigationOrchestrator';
 import { traceLogger } from '../services/observability/traceLogger';
+import { INITIAL_FAILED_CASES } from '../data/mockData';
 
 interface EvalResult {
   id: string;
@@ -521,25 +522,24 @@ export async function runStockTraceEvaluationSuite(): Promise<{
   }
 
   // --------------------------------------------------------------------------
-  // E13: Evidence-tier selection and cost guardrail
+  // E13: Evidence-tier progression (Tier 1 scanner -> Tier 2 camera)
   // --------------------------------------------------------------------------
   {
-    const lowValueItem = { sku: 'SKU-LOW', value: 850 };
-    const highValueItem = { sku: 'SKU-HIGH', value: 12500 };
-    const threshold = 5000;
+    const conclusiveCase = INITIAL_FAILED_CASES.find((c) => c.id === 'CASE-1042')!;
+    const cameraEvaluatedCase = INITIAL_FAILED_CASES.find((c) => c.id === 'CASE-9800')!;
 
-    const lowEligible = lowValueItem.value >= threshold;
-    const highEligible = highValueItem.value >= threshold;
-
-    const passed = lowEligible === false && highEligible === true;
+    const passed =
+      conclusiveCase.evidenceTierUsed === 'TIER_1_SCANNER_WMS' &&
+      cameraEvaluatedCase.evidenceTierUsed === 'TIER_2_TARGETED_CAMERA' &&
+      cameraEvaluatedCase.cameraEvidence?.status === 'AVAILABLE';
 
     results.push({
       id: 'E13',
-      title: 'Evidence-tier selection -> Cost guardrail blocks low-value Tier 3 AI compute',
+      title: 'Evidence-tier progression -> Tier 1 scanner evaluation proceeds to Tier 2 camera evidence when inconclusive',
       passed,
       notes: passed
-        ? 'Low-value item (₹850 < ₹5,000) blocked from Tier 3 AI video compute; high-value (₹12,500) allowed.'
-        : 'Failed cost guardrail logic.',
+        ? 'Tier 1 scanner records evaluate first; inconclusive scanner evidence progresses to Tier 2 camera evidence.'
+        : 'Failed 2-tier evidence engine progression.',
     });
   }
 
@@ -773,23 +773,24 @@ export async function runStockTraceEvaluationSuite(): Promise<{
   }
 
   // --------------------------------------------------------------------------
-  // E23: Demo Scenario 8 — High-value item (₹18,000) eligible for simulated Tier 3 AI
+  // E23: Demo Scenario 8 — Targeted camera evidence (Tier 2) identifying Bay E14
   // --------------------------------------------------------------------------
   {
     const sc8 = DEMO_SCENARIOS.find((s) => s.id === 'scenario-8')!;
-    const isEligible = (sc8.itemValue || 0) >= 5000;
+    const inv8 = executeScenarioInvestigation(sc8);
     const passed =
-      sc8.expectedOutcomeType === 'HIGH_VALUE_TIER3' &&
-      isEligible &&
-      sc8.itemValue === 18000;
+      sc8.expectedOutcomeType === 'TIER_2_CAMERA' &&
+      inv8.evaluation.topCandidate?.location === 'E14' &&
+      inv8.fusedReport.hasCameraFootage === true &&
+      inv8.fusedReport.observedEvidence[0]?.source_id === 'CAM-PLC-09';
 
     results.push({
       id: 'E23',
-      title: 'Demo Scenario 8 -> High-value item qualifies for simulated Tier 3 AI video workflow',
+      title: 'Demo Scenario 8 -> Evaluates Tier 2 camera footage (CAM-PLC-09) to recommend Bay E14',
       passed,
       notes: passed
-        ? 'High value (₹18,000 >= ₹5,000) justified simulated Tier 3 compute analysis (~₹120).'
-        : 'Failed high-value threshold check.',
+        ? 'Tier 1 inconclusive; Tier 2 camera footage evaluated and recommended Bay E14 with pre-recorded/simulated transparency.'
+        : 'Failed Scenario 8 Tier 2 camera evaluation.',
     });
   }
 
@@ -1190,7 +1191,7 @@ export async function runStockTraceEvaluationSuite(): Promise<{
         'STALE',
         'LESS_QUANTITY',
         'DAMAGED',
-        'HIGH_VALUE_TIER3',
+        'TIER_2_CAMERA',
       ].includes(s.expectedOutcomeType)
     );
     const passed = totalScenarios === 8 && allHavePrompts && validOutcomeTypes;
@@ -1360,25 +1361,25 @@ export async function runStockTraceEvaluationSuite(): Promise<{
   }
 
   // --------------------------------------------------------------------------
-  // E44: Scenario 8 High-Value Tier 3 Cost & Policy Verification
+  // E44: Scenario 8 Tier 2 Camera Evidence & Human Confirmation Guardrail
   // --------------------------------------------------------------------------
   {
     const sc8 = DEMO_SCENARIOS.find((s) => s.id === 'scenario-8')!;
-    const qualifies = (sc8.itemValue || 0) >= 5000;
     const inv8 = executeScenarioInvestigation(sc8);
 
     const passed =
-      qualifies &&
-      sc8.expectedOutcomeType === 'HIGH_VALUE_TIER3' &&
-      sc8.itemValue === 18000;
+      sc8.expectedOutcomeType === 'TIER_2_CAMERA' &&
+      inv8.evaluation.topCandidate?.location === 'E14' &&
+      inv8.caseModel.status === 'AWAITING_VERIFICATION' &&
+      inv8.caseModel.worker_verification === undefined;
 
     results.push({
       id: 'E44',
-      title: 'Scenario 8 -> High-value item qualifies for Tier 3 simulated AI video analysis with cost logging',
+      title: 'Scenario 8 -> Tier 2 camera evidence recommends Bay E14 without auto-completing physical verification',
       passed,
       notes: passed
-        ? `High-value item (₹18,000 >= ₹5,000) qualifies for simulated Tier 3 compute (~₹120) with grounded transparency.`
-        : 'High-value Tier 3 qualification failed.',
+        ? `Tier 2 camera observation (CAM-PLC-09) provides grounded recommendation for Bay E14; human confirmation required.`
+        : 'Scenario 8 Tier 2 camera evidence or confirmation guardrail failed.',
     });
   }
 

@@ -43,7 +43,7 @@ export const ALLOWED_STATE_TRANSITIONS: Record<InvestigationState, Investigation
 /**
  * Evidence Tiers
  */
-export type EvidenceTier = 'TIER_1_SCANNER_WMS' | 'TIER_2_TARGETED_CAMERA' | 'TIER_3_CONDITIONAL_AI';
+export type EvidenceTier = 'TIER_1_SCANNER_WMS' | 'TIER_2_TARGETED_CAMERA';
 
 /**
  * Tool Permission Classification

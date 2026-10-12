@@ -33,7 +33,7 @@ export interface DemoScenario {
     | 'STALE'
     | 'LESS_QUANTITY'
     | 'DAMAGED'
-    | 'HIGH_VALUE_TIER3';
+    | 'TIER_2_CAMERA';
   defaultReportPrompt?: {
     en: string;
     hi: string;
@@ -276,10 +276,10 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
   {
     id: 'scenario-8',
     scenarioNumber: 8,
-    label: '8 · High-Value (AI)',
+    label: '8 · Camera (Tier 2)',
     shortTag: '9800',
-    title: 'Scenario 8 — High-Value Item (Simulated Tier 3 AI)',
-    description: 'Item value ₹18,000 exceeds ₹5,000 threshold. Inconclusive Tier 1 allows prototype AI video analysis (~₹120 cost).',
+    title: 'Scenario 8 — Targeted Camera Evidence (Tier 2)',
+    description: 'Tier 1 scanner records inconclusive. Evaluates Tier 2 camera footage (CAM-PLC-09) observing trolley moving item to Bay E14.',
     caseId: 'CASE-9800',
     sku: 'SKU-9800',
     item: 'Programmable Logic Controller (PLC) Module',
@@ -310,7 +310,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     engineOptions: {
       referenceNow: '06:05',
     },
-    expectedOutcomeType: 'HIGH_VALUE_TIER3',
+    expectedOutcomeType: 'TIER_2_CAMERA',
     defaultReportPrompt: {
       en: 'Cannot find PLC Module at expected locked cage bay E10.',
       hi: 'पीएलसी मॉड्यूल अपेक्षित लॉक किए गए केज बे E10 में नहीं मिल रहा है।',

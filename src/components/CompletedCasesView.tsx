@@ -81,7 +81,7 @@ export const CompletedCasesView: React.FC<CompletedCasesViewProps> = ({
                       {/* Evidence Badge */}
                       <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">
                         <Layers className="w-3 h-3 text-slate-500" />
-                        <span>{c.evidenceTierUsed === 'TIER_3_CONDITIONAL_AI' ? 'Tier 3 (AI Video)' : c.evidenceTierUsed === 'TIER_2_TARGETED_CAMERA' ? 'Tier 2 (Targeted Camera)' : c.evidenceTierUsed === 'INSUFFICIENT' ? 'Insufficient Evidence' : 'Tier 1 (Scanner & WMS)'}</span>
+                        <span>{c.evidenceTierUsed === 'TIER_2_TARGETED_CAMERA' ? 'Tier 2 (Targeted Camera)' : c.evidenceTierUsed === 'INSUFFICIENT' ? 'Insufficient Evidence' : 'Tier 1 (Scanner & WMS)'}</span>
                       </span>
 
                       {/* Picker Response */}

@@ -13,7 +13,6 @@ import {
   X,
   FileText,
   Video,
-  Cpu,
   Scan,
   AlertCircle,
   History,
@@ -52,14 +51,8 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
   onResetCase,
   onRequestRecheck,
 }) => {
-  // Active Evidence Tier Tab: Tier 1 (Scanner), Tier 2 (Camera), Tier 3 (AI Video)
-  const [activeTierTab, setActiveTierTab] = useState<'tier-1' | 'tier-2' | 'tier-3'>('tier-1');
-
-  // Tier 3 Prototype AI execution state
-  const [isAiRunning, setIsAiRunning] = useState<boolean>(false);
-  const [tier3Completed, setTier3Completed] = useState<boolean>(
-    caseData.tier3AiAnalysis?.status === 'COMPLETED'
-  );
+  // Active Evidence Tier Tab: Tier 1 (Scanner), Tier 2 (Camera)
+  const [activeTierTab, setActiveTierTab] = useState<'tier-1' | 'tier-2'>('tier-1');
 
   // Sub-actions and dialogs
   const [verificationOutcome, setVerificationOutcome] = useState<WorkerVerificationOutcome | null>(
@@ -73,10 +66,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
     if (caseData.pickerOutcome) {
       setVerificationOutcome(caseData.pickerOutcome);
     }
-    if (caseData.tier3AiAnalysis?.status === 'COMPLETED') {
-      setTier3Completed(true);
-    }
-  }, [caseData.pickerOutcome, caseData.status, caseData.tier3AiAnalysis?.status]);
+  }, [caseData.pickerOutcome, caseData.status]);
 
   const scannerList = SCANNER_TRANSACTIONS[caseData.sku] || [
     {
@@ -103,19 +93,6 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
   const isStale = caseData.evidenceTierUsed === 'STALE';
   const isConflicting = caseData.evidenceTierUsed === 'CONFLICTING';
   const isInsufficient = caseData.evidenceTierUsed === 'INSUFFICIENT';
-
-  // Tier 3 Eligibility check: threshold >= ₹5,000 or high priority or repeated checks
-  const isTier3Eligible = (caseData.itemValue || 0) >= 5000 || caseData.priority === 'HIGH' || caseData.tier3AiAnalysis?.eligible;
-
-  // Run Tier 3 prototype AI analysis
-  const handleRunTier3Analysis = () => {
-    if (!isTier3Eligible) return;
-    setIsAiRunning(true);
-    setTimeout(() => {
-      setIsAiRunning(false);
-      setTier3Completed(true);
-    }, 1200);
-  };
 
   // Supervisor completes resolution
   const handleSupervisorConfirm = (outcome: WorkerVerificationOutcome, qtyOverride?: number, customNote?: string) => {
@@ -146,7 +123,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
       expectedLocation: caseData.expectedLocation,
       verifiedLocation,
       resolutionTime: '02:41',
-      evidence: `Tier ${activeTierTab === 'tier-3' ? '3' : activeTierTab === 'tier-2' ? '2' : '1'} Evidence Chain`,
+      evidence: `Tier ${activeTierTab === 'tier-2' ? '2' : '1'} Evidence Chain`,
       status: isResolved ? 'Resolved' : 'Escalated',
       outcome,
       foundQuantity: qtyOverride || customQty,
@@ -326,7 +303,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                 Evidence Engine
               </span>
               <h2 className="text-sm font-bold text-slate-900 mt-0.5">
-                3 Investigation Tiers
+                2 Investigation Tiers
               </h2>
             </div>
             <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold">
@@ -335,8 +312,9 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
           </div>
 
           {/* Tier Selector Pills */}
-          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
             <button
+              id="btn-tab-tier-1"
               onClick={() => setActiveTierTab('tier-1')}
               className={`py-1.5 px-2 rounded-md transition-colors cursor-pointer text-center ${
                 activeTierTab === 'tier-1'
@@ -347,6 +325,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
               Tier 1: Scanner
             </button>
             <button
+              id="btn-tab-tier-2"
               onClick={() => setActiveTierTab('tier-2')}
               className={`py-1.5 px-2 rounded-md transition-colors cursor-pointer text-center ${
                 activeTierTab === 'tier-2'
@@ -355,16 +334,6 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
               }`}
             >
               Tier 2: Camera
-            </button>
-            <button
-              onClick={() => setActiveTierTab('tier-3')}
-              className={`py-1.5 px-2 rounded-md transition-colors cursor-pointer text-center ${
-                activeTierTab === 'tier-3'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Tier 3: AI Video
             </button>
           </div>
 
@@ -400,7 +369,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                 <span>Insufficient Tier 1 Evidence</span>
               </div>
               <p className="text-slate-700 text-[11px] leading-relaxed">
-                No movements recorded since put-away. StockTrace refuses to propose an arbitrary location.
+                No movements recorded since put-away. StockTrace refuses to propose an arbitrary location. Check Tier 2 camera footage or request a floor re-check.
               </p>
             </div>
           )}
@@ -412,7 +381,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                 <span className="font-bold uppercase tracking-wider text-slate-500">
                   Handheld Scanner Movement Stream
                 </span>
-                <span className="text-teal-700 font-semibold">Cost: ₹0 (Default)</span>
+                <span className="text-teal-700 font-semibold font-mono">Tier 1 &bull; Standard</span>
               </div>
 
               <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden font-mono text-[11px]">
@@ -431,7 +400,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
               </div>
 
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Deterministic evidence rules evaluate SKU recency, origin, and destination timestamps.
+                Deterministic evidence rules evaluate SKU recency, origin, and destination timestamps. If scanner transactions are inconclusive, stale, or conflicting, investigation progresses to Tier 2 targeted camera evidence.
               </p>
             </div>
           )}
@@ -441,9 +410,9 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
             <div className="space-y-3 text-xs">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="font-bold uppercase tracking-wider text-slate-500">
-                  Targeted Pre-recorded Camera Feed
+                  Targeted Camera Evidence (Simulated / Pre-recorded)
                 </span>
-                <span className="text-indigo-700 font-semibold">Low Overhead</span>
+                <span className="text-indigo-700 font-semibold font-mono">Tier 2 Verified</span>
               </div>
 
               {caseData.cameraEvidence?.status === 'BLIND_SPOT' ? (
@@ -451,7 +420,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                   <Video className="w-6 h-6 text-slate-400 mx-auto" />
                   <div className="font-bold text-slate-800 text-xs">Camera Blind Spot / Feed Offline</div>
                   <p className="text-[11px] text-slate-500">
-                    Aisle 7 camera is unmonitored or obscured. Relies strictly on Tier 1 scanner evidence.
+                    Targeted aisle camera is unmonitored or obscured. Refuses to guess location; human physical verification required.
                   </p>
                 </div>
               ) : (
@@ -465,7 +434,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                   </div>
 
                   <div className="bg-slate-950 rounded p-2.5 border border-slate-800 text-[11px] space-y-1">
-                    <div className="text-teal-400 font-semibold">Visual Observation:</div>
+                    <div className="text-teal-400 font-semibold">Visual Observation (Simulated Clip):</div>
                     <p className="text-slate-300">
                       {caseData.cameraEvidence?.observation || 'Floor associate cart observed departing A12 toward Bin B07.'}
                     </p>
@@ -474,79 +443,6 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
                   <div className="text-[10px] text-slate-400 italic">
                     <strong>Limitation:</strong> {caseData.cameraEvidence?.limitation || 'Viewing angle does not show shelf interior; verification required.'}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TIER 3 VIEW: CONDITIONAL AI VIDEO ANALYSIS */}
-          {activeTierTab === 'tier-3' && (
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold uppercase tracking-wider text-slate-500">
-                  Conditional Prototype AI Video Analysis
-                </span>
-                <span className="text-purple-700 font-semibold font-mono">Est. Compute: ₹120</span>
-              </div>
-
-              {/* Guardrail Check: Is item eligible? */}
-              {!isTier3Eligible ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center space-x-1.5 font-bold text-amber-900">
-                    <AlertTriangle className="w-4 h-4 text-amber-700" />
-                    <span>Blocked by Cost Guardrail</span>
-                  </div>
-                  <p className="text-amber-950 text-[11px] leading-relaxed">
-                    Item value (₹{(caseData.itemValue || 0).toLocaleString('en-IN')}) is below the ₹5,000 threshold required for automated AI video frame analysis.
-                  </p>
-                  <p className="text-[10px] text-amber-800">
-                    Prevents unprofitable compute spend on low-value inventory exceptions.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="p-3 rounded-lg bg-purple-50 border border-purple-200 text-purple-950 space-y-1 text-xs">
-                    <div className="font-bold flex items-center space-x-1">
-                      <Cpu className="w-3.5 h-3.5 text-purple-700" />
-                      <span>High-Value Exception Eligible</span>
-                    </div>
-                    <p className="text-[11px]">
-                      Item value ₹{(caseData.itemValue || 0).toLocaleString('en-IN')} meets threshold for prototype computer vision frame verification.
-                    </p>
-                  </div>
-
-                  {tier3Completed ? (
-                    <div className="bg-slate-900 text-slate-200 rounded-lg p-3 space-y-2 border border-slate-800 text-xs">
-                      <div className="flex justify-between items-center text-[11px] text-purple-400 font-mono">
-                        <span>FRAME MATCH &bull; CONFIDENCE 92%</span>
-                        <span>ANALYSIS COMPLETE</span>
-                      </div>
-                      <p className="text-[11px] text-slate-300">
-                        {caseData.tier3AiAnalysis?.analysisSummary || 'Multi-frame visual recognition confirmed manufacturer seal match placed into Bay E02/E14.'}
-                      </p>
-                      <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">
-                        Compute cost ₹120 logged to facility operational analysis ledger.
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleRunTier3Analysis}
-                      disabled={isAiRunning}
-                      className="w-full py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-2xs transition-colors"
-                    >
-                      {isAiRunning ? (
-                        <>
-                          <Cpu className="w-3.5 h-3.5 animate-spin" />
-                          <span>Processing CCTV Frame Sequence...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Cpu className="w-3.5 h-3.5" />
-                          <span>Run Prototype AI Video Analysis (~₹120)</span>
-                        </>
-                      )}
-                    </button>
-                  )}
                 </div>
               )}
             </div>

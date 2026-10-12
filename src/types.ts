@@ -44,7 +44,6 @@ export type EvidenceType =
 export type EvidenceTier =
   | 'TIER_1_SCANNER_WMS'
   | 'TIER_2_TARGETED_CAMERA'
-  | 'TIER_3_CONDITIONAL_AI'
   | 'INSUFFICIENT'
   | 'CONFLICTING'
   | 'STALE'
@@ -86,18 +85,6 @@ export interface CameraEvidenceDetail {
   status: 'AVAILABLE' | 'UNAVAILABLE' | 'BLIND_SPOT';
 }
 
-export interface Tier3AiAnalysisDetail {
-  eligible: boolean;
-  ineligibilityReason?: string;
-  status: 'NOT_RUN' | 'RUNNING' | 'COMPLETED' | 'BLOCKED_BY_GUARDRAIL';
-  triggeredReason?: string;
-  estimatedCostInr: number;
-  visualConfidence?: number;
-  analysisSummary?: string;
-  detectedLocation?: string;
-  timestamp?: string;
-}
-
 export interface FailedPickCase {
   id: string;
   sku: string;
@@ -136,7 +123,6 @@ export interface FailedPickCase {
     kn: string;
   };
   cameraEvidence?: CameraEvidenceDetail;
-  tier3AiAnalysis?: Tier3AiAnalysisDetail;
   auditTrail?: CaseAuditEntry[];
 }
 

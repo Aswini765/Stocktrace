@@ -53,7 +53,6 @@ export const ManagerRoiDashboard: React.FC<ManagerRoiDashboardProps> = ({
       return {
         tier1Percent: 0,
         tier2Percent: 0,
-        tier3Percent: 0,
         insufficientPercent: 0,
         totalCases: 0,
       };
@@ -66,9 +65,6 @@ export const ManagerRoiDashboard: React.FC<ManagerRoiDashboardProps> = ({
     const tier2Count = cases.filter(
       (c) => c.evidenceTierUsed === 'TIER_2_TARGETED_CAMERA' || c.evidenceTierUsed === 'SCANNER_ONLY'
     ).length;
-    const tier3Count = cases.filter(
-      (c) => c.evidenceTierUsed === 'TIER_3_CONDITIONAL_AI'
-    ).length;
     const insufficientCount = cases.filter(
       (c) => c.evidenceTierUsed === 'INSUFFICIENT' || c.evidenceTierUsed === 'CONFLICTING' || c.evidenceTierUsed === 'STALE'
     ).length;
@@ -76,7 +72,6 @@ export const ManagerRoiDashboard: React.FC<ManagerRoiDashboardProps> = ({
     return {
       tier1Percent: Math.round((tier1Count / total) * 100),
       tier2Percent: Math.round((tier2Count / total) * 100),
-      tier3Percent: Math.round((tier3Count / total) * 100),
       insufficientPercent: Math.round((insufficientCount / total) * 100),
       totalCases: total,
     };
@@ -788,20 +783,6 @@ export const ManagerRoiDashboard: React.FC<ManagerRoiDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Tier 3 */}
-              <div>
-                <div className="flex justify-between text-[11px] mb-1">
-                  <span className="font-medium text-slate-700">Tier 3: Conditional Prototype AI Video</span>
-                  <span className="font-mono font-bold text-slate-900">{evidenceTierStats.tier3Percent}%</span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-purple-600 h-full rounded-full"
-                    style={{ width: `${evidenceTierStats.tier3Percent}%` }}
-                  />
-                </div>
-              </div>
-
               {/* Insufficient / Conflicting */}
               <div>
                 <div className="flex justify-between text-[11px] mb-1">
@@ -818,7 +799,7 @@ export const ManagerRoiDashboard: React.FC<ManagerRoiDashboardProps> = ({
             </div>
 
             <p className="text-[10px] text-slate-400 pt-1 leading-snug">
-              Derived directly from active cases dataset in the application. Expensive Tier 3 compute is restricted only to high-value items or repeated failed checks.
+              Derived directly from active cases dataset in the application. Evaluates Tier 1 scanner transactions first, moving to targeted Tier 2 camera evidence when needed.
             </p>
           </div>
         </div>
