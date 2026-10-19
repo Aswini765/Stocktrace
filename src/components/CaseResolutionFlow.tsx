@@ -28,6 +28,7 @@ interface CaseResolutionFlowProps {
   caseData: FailedPickCase;
   scenario?: ScenarioType;
   onCompleteResolution: (details: {
+    caseId?: string;
     sku: string;
     itemName: string;
     expectedLocation: string;
@@ -118,6 +119,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
     }
 
     onCompleteResolution({
+      caseId: caseData.id,
       sku: caseData.sku,
       itemName: caseData.item,
       expectedLocation: caseData.expectedLocation,
@@ -295,7 +297,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
           </div>
         </div>
 
-        {/* COLUMN 2: THREE INVESTIGATION TIERS (5 COLS) */}
+        {/* COLUMN 2: 2 INVESTIGATION TIERS (5 COLS) */}
         <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-4">
           <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
             <div>

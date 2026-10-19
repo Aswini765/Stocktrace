@@ -142,20 +142,25 @@ export default function App() {
     foundQuantity?: number;
     discrepancyReason?: string;
   }) => {
+    const targetCaseId = details.caseId || activeCaseId;
+    if (targetCaseId) {
+      setActiveCaseId(targetCaseId);
+    }
+
     const invId =
       details.sku === 'SKU-1042'
         ? 'INV-1042'
-        : `INV-${Math.floor(1000 + Math.random() * 9000)}`;
+        : `INV-${targetCaseId ? targetCaseId.replace('CASE-', '') : Math.floor(1000 + Math.random() * 9000)}`;
 
     const discId =
       details.sku === 'SKU-1042'
         ? 'DISC-881'
-        : `DISC-${Math.floor(880 + Math.random() * 100)}`;
+        : `DISC-${targetCaseId ? targetCaseId.replace('CASE-', '') : Math.floor(880 + Math.random() * 100)}`;
 
     const newInv: InvestigationRecord = {
       id: invId,
-      caseId: activeCaseId || undefined,
-      taskId: activeCaseId || undefined,
+      caseId: targetCaseId || undefined,
+      taskId: targetCaseId || undefined,
       sku: details.sku,
       expectedLocation: details.expectedLocation,
       recommendedLocation: details.verifiedLocation === '—' ? '—' : details.verifiedLocation,
@@ -179,8 +184,8 @@ export default function App() {
 
     const newDisc: DiscrepancyRecord = {
       id: discId,
-      caseId: activeCaseId || undefined,
-      taskId: activeCaseId || undefined,
+      caseId: targetCaseId || undefined,
+      taskId: targetCaseId || undefined,
       sku: details.sku,
       itemName: details.itemName,
       expectedLocation: details.expectedLocation,
@@ -214,10 +219,10 @@ export default function App() {
       setResolutionNotice(`⚠ ${details.sku} escalated to Warehouse Supervisor review.`);
     }
 
-    // Update case in state
+    // Update case in state (strictly match caseId first)
     setCases((prev) =>
       prev.map((c) =>
-        (details.caseId ? c.id === details.caseId : false) || c.sku === details.sku
+        (details.caseId ? c.id === details.caseId : c.sku === details.sku)
           ? {
               ...c,
               status: details.status === 'Resolved' ? 'RESOLVED' : 'ESCALATED',
@@ -277,6 +282,111 @@ export default function App() {
       foundQuantity: details.foundQuantity,
       discrepancyReason: details.notes,
     });
+  };
+
+  // Handler when picker initiates an investigation or reports an item
+  const handlePickerReportInitiated = (report: {
+    caseId?: string;
+    sku?: string;
+    itemName: string;
+    expectedLocation?: string;
+    rawText: string;
+    isUnidentified?: boolean;
+  }): string => {
+    // 1. If unidentified item report (e.g. "I cannot find charger")
+    if (report.isUnidentified) {
+      const unId = `CASE-UNID-${Date.now().toString().slice(-4)}`;
+      const newCase: FailedPickCase = {
+        id: unId,
+        sku: 'UNIDENTIFIED',
+        item: `Missing: ${report.itemName}`,
+        qty: 1,
+        expectedLocation: '—',
+        status: 'ESCALATED',
+        priority: 'HIGH',
+        reportedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        reportedBy: 'Floor Associate (Picker)',
+        pickerOutcome: 'ESCALATE',
+        pickerNotes: `Unidentified item reported: "${report.rawText}". Item not found in catalog or dispatch orders.`,
+        pickerTimestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        evidenceTierUsed: 'INSUFFICIENT',
+        tierResolutionNote: 'Picker reported item could not be identified in catalog or dispatch orders. Supervisor review required.',
+        auditTrail: [
+          {
+            id: `AUD-${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            actor: 'Floor Associate (Picker)',
+            action: 'UNIDENTIFIED_ITEM_REPORTED',
+            details: `Picker entered: "${report.rawText}". Requested supervisor assistance.`,
+          },
+        ],
+      };
+      setCases((prev) => [newCase, ...prev.filter((c) => c.id !== unId)]);
+      setActiveCaseId(unId);
+      return unId;
+    }
+
+    // 2. If identified item: find existing case or create new case
+    const existing = cases.find(
+      (c) => (report.caseId && c.id === report.caseId) || (report.sku && c.sku === report.sku)
+    );
+
+    if (existing) {
+      setCases((prev) =>
+        prev.map((c) =>
+          c.id === existing.id
+            ? {
+                ...c,
+                status: 'INVESTIGATING',
+                pickerNotes: report.rawText,
+                pickerTimestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                auditTrail: [
+                  ...(c.auditTrail || []),
+                  {
+                    id: `AUD-${Date.now()}`,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    actor: 'Floor Associate (Picker)',
+                    action: 'FAILED_PICK_REPORTED',
+                    details: report.rawText,
+                  },
+                ],
+              }
+            : c
+        )
+      );
+      setActiveCaseId(existing.id);
+      return existing.id;
+    }
+
+    const cleanNum = report.sku ? report.sku.replace('SKU-', '') : Date.now().toString().slice(-4);
+    const newId = `CASE-${cleanNum}`;
+    const newCase: FailedPickCase = {
+      id: newId,
+      sku: report.sku || `SKU-${cleanNum}`,
+      item: report.itemName,
+      qty: 1,
+      expectedLocation: report.expectedLocation || 'A12',
+      status: 'INVESTIGATING',
+      priority: 'NORMAL',
+      destinationBin: 'TOTE-44',
+      reportedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      reportedBy: 'Floor Associate (Picker)',
+      pickerNotes: report.rawText,
+      pickerTimestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      evidenceTierUsed: 'TIER_1_SCANNER_WMS',
+      auditTrail: [
+        {
+          id: `AUD-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          actor: 'Floor Associate (Picker)',
+          action: 'FAILED_PICK_REPORTED',
+          details: report.rawText,
+        },
+      ],
+    };
+    setCases((prev) => [newCase, ...prev.filter((c) => c.id !== newId)]);
+    setActiveCaseId(newId);
+    return newId;
   };
 
   // Switch to Supervisor view directly from Picker or Home
@@ -357,6 +467,7 @@ export default function App() {
               cases={cases}
               activeCaseId={activeCaseId}
               onSelectCase={(id) => setActiveCaseId(id)}
+              onPickerReportInitiated={handlePickerReportInitiated}
               onPickerVerification={handlePickerVerification}
               onResetCase={handleResetCase}
               onSwitchToSupervisor={handleSwitchToSupervisor}

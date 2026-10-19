@@ -9,9 +9,9 @@ export interface LocalizedString {
 export const PICKER_I18N = {
   header: {
     terminalTitle: {
-      en: 'StockTrace Terminal',
-      hi: 'स्टॉकट्रेस टर्मिनल',
-      kn: 'ಸ್ಟಾಕ್‌ಟ್ರೇಸ್ ಟರ್ಮಿನಲ್',
+      en: 'StockTrace Assistant',
+      hi: 'स्टॉकट्रेस सहायक',
+      kn: 'ಸ್ಟಾಕ್‌ಟ್ರೇಸ್ ಸಹಾಯಕ',
     },
     demoSelectorLabel: {
       en: 'Demo Scenario:',
@@ -24,14 +24,139 @@ export const PICKER_I18N = {
       kn: 'ಸಿಮ್ಯುಲೇಟೆಡ್ ಡೆಮೊ ಡೇಟಾ',
     },
     expectedBinLabel: {
-      en: 'Expected Bin Location',
-      hi: 'अपेक्षित बिन स्थान',
-      kn: 'ನಿರೀಕ್ಷಿತ ಬಿನ್ ಸ್ಥಳ',
+      en: 'Expected Shelf Location',
+      hi: 'अपेक्षित शेल्फ़ स्थान',
+      kn: 'ನಿರೀಕ್ಷಿತ ಶೆಲ್ಫ್ ಸ್ಥಳ',
     },
     qtyToPick: {
       en: 'Qty to Pick:',
       hi: 'लेने की मात्रा:',
       kn: 'ತೆಗೆದುಕೊಳ್ಳಬೇಕಾದ ಪ್ರಮಾಣ:',
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // SIMPLIFIED 5-STEP WORKFLOW STRINGS (Strict Section 4 Compliance)
+  // -------------------------------------------------------------------------
+  steps: {
+    // Step 1: Ask what is missing
+    step1AskMissing: {
+      en: 'Hello! Which item can you not find?',
+      hi: 'नमस्ते! आपको कौन-सा सामान नहीं मिल रहा है?',
+      kn: 'ನಮಸ್ಕಾರ! ನಿಮಗೆ ಯಾವ ವಸ್ತು ಸಿಗುತ್ತಿಲ್ಲ?',
+    },
+    step1InputPlaceholder: {
+      en: 'Type the item name or shelf number...',
+      hi: 'सामान का नाम या शेल्फ़ नंबर लिखें...',
+      kn: 'ವಸ್ತುವಿನ ಹೆಸರು ಅಥವಾ ಶೆಲ್ಫ್ ಸಂಖ್ಯೆ ಬರೆಯಿರಿ...',
+    },
+    step1Send: {
+      en: 'Check Item',
+      hi: 'सामान जांचें',
+      kn: 'ವಸ್ತು ಪರಿಶೀಲಿಸಿ',
+    },
+
+    // Step 2: Confirm correct item
+    step2ItemFound: (item: string): LocalizedString => ({
+      en: `I found your item: "${item}". Is this the correct one?`,
+      hi: `मुझे आपका सामान मिला: "${item}"। क्या यह सही है?`,
+      kn: `ನನಗೆ ನಿಮ್ಮ ವಸ್ತು ಸಿಕ್ಕಿದೆ: "${item}". ಇದು ಸರಿಯೇ?`,
+    }),
+    step2ConfirmYes: {
+      en: 'Yes, this is it',
+      hi: 'हाँ, यही है',
+      kn: 'ಹೌದು, ಇದೇ ಸರಿ',
+    },
+    step2ConfirmNo: {
+      en: 'No, try another item',
+      hi: 'नहीं, दूसरा खोजें',
+      kn: 'ಇಲ್ಲ, ಮತ್ತೊಂದು ಹುಡುಕಿ',
+    },
+    step2MultipleMatches: {
+      en: 'I found more than one item with a similar name. Please choose yours:',
+      hi: 'मुझे इस नाम से मिलते-जुलते एक से अधिक सामान मिले। कृपया अपना सामान चुनें:',
+      kn: 'ಇದೇ ಹೆಸರಿನ ಒಂದಕ್ಕಿಂತ ಹೆಚ್ಚು ವಸ್ತುಗಳು ಕಂಡುಬಂದಿವೆ. ದಯವಿಟ್ಟು ನಿಮ್ಮದನ್ನು ಆಯ್ಕೆಮಾಡಿ:',
+    },
+    step2NoMatch: {
+      en: 'I could not find this item in the list. Please try another name or ask your supervisor for help.',
+      hi: 'मुझे सूची में यह सामान नहीं मिला। कृपया दूसरा नाम आज़माएं या अपने सुपरवाइज़र से मदद लें।',
+      kn: 'ಪಟ್ಟಿಯಲ್ಲಿ ಈ ವಸ್ತು ಕಂಡುಬಂದಿಲ್ಲ. ದಯವಿಟ್ಟು ಇನ್ನೊಂದು ಹೆಸರನ್ನು ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರ ಸಹಾಯ ಕೇಳಿ.',
+    },
+    step2TryAgain: {
+      en: 'Try Another Name',
+      hi: 'दूसरा नाम आज़माएं',
+      kn: 'ಇನ್ನೊಂದು ಹೆಸರನ್ನು ಪ್ರಯತ್ನಿಸಿ',
+    },
+    step2AskSupervisor: {
+      en: 'Ask Supervisor for Help',
+      hi: 'सुपरवाइज़र से मदद मांगें',
+      kn: 'ಮೇಲ್ವಿಚಾರಕರ ಸಹಾಯ ಕೇಳಿ',
+    },
+
+    // Step 3: Explain where to look
+    step3ExplainLocation: (bin: string, landmark?: string): LocalizedString => ({
+      en: `Please check shelf ${bin}.${landmark ? ' ' + landmark : ''}`,
+      hi: `कृपया शेल्फ़ ${bin} देखें।${landmark ? ' ' + landmark : ''}`,
+      kn: `ದಯವಿಟ್ಟು ಶೆಲ್ಫ್ ${bin} ಪರಿಶೀಲಿಸಿ.${landmark ? ' ' + landmark : ''}`,
+    }),
+    step3CannotConfirm: {
+      en: 'I could not confirm where the item is. I am asking your supervisor to help.',
+      hi: 'मैं यह पुष्टि नहीं कर सका कि सामान कहाँ है। मैं आपके सुपरवाइज़र से मदद माँग रहा हूँ।',
+      kn: 'ವಸ್ತು ಎಲ್ಲಿದೆ ಎಂದು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಾನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರ ಸಹಾಯ ಕೇಳುತ್ತಿದ್ದೇನೆ.',
+    },
+    step3LookingPrompt: {
+      en: 'Please check the shelf. What happened?',
+      hi: 'कृपया शेल्फ़ की जांच करें। क्या हुआ?',
+      kn: 'ದಯವಿಟ್ಟು ಶೆಲ್ಫ್ ಪರಿಶೀಲಿಸಿ. ಏನಾಯಿತು?',
+    },
+
+    // Step 4: Ask what happened (4 large high-contrast buttons)
+    step4ActionFound: {
+      en: 'I found it.',
+      hi: 'मिल गया।',
+      kn: 'ಸಿಕ್ಕಿದೆ.',
+    },
+    step4ActionNotFound: {
+      en: 'It is not here.',
+      hi: 'यहाँ नहीं है।',
+      kn: 'ಇಲ್ಲಿಲ್ಲ.',
+    },
+    step4ActionFewer: {
+      en: 'I found fewer items.',
+      hi: 'कम सामान मिला।',
+      kn: 'ಕಡಿಮೆ ವಸ್ತುಗಳು ಸಿಕ್ಕಿವೆ.',
+    },
+    step4ActionDamaged: {
+      en: 'The item is damaged.',
+      hi: 'सामान टूटा या खराब है।',
+      kn: 'ವಸ್ತು ಹಾಳಾಗಿದೆ.',
+    },
+
+    // Step 5: Explain what happens next
+    step5ThankYouFound: {
+      en: 'Thank you! I have recorded that you found it.',
+      hi: 'धन्यवाद! मैंने दर्ज कर लिया है कि आपको सामान मिल गया है।',
+      kn: 'ಧನ್ಯವಾದಗಳು! ನಿಮಗೆ ವಸ್ತು ಸಿಕ್ಕಿದೆ ಎಂದು ನಾನು ದಾಖಲಿಸಿದ್ದೇನೆ.',
+    },
+    step5ThankYouNotFound: {
+      en: 'Thank you for checking. I am sending this case to your supervisor.',
+      hi: 'जांच करने के लिए धन्यवाद। मैं यह केस आपके सुपरवाइज़र को भेज रहा हूँ।',
+      kn: 'ಪರಿಶೀಲಿಸಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು. ನಾನು ಈ ಪ್ರಕರಣವನ್ನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸುತ್ತಿದ್ದೇನೆ.',
+    },
+    step5ShortageLogged: (found: number, expected: number): LocalizedString => ({
+      en: `Thank you for checking. I have recorded that you found ${found} of ${expected} items and reported the shortage to your supervisor.`,
+      hi: `जांच करने के लिए धन्यवाद। मैंने दर्ज कर लिया है कि आपको ${expected} में से ${found} सामान मिला और कमी की जानकारी सुपरवाइज़र को भेज दी है।`,
+      kn: `ಪರಿಶೀಲಿಸಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು. ನೀವು ${expected} ರಲ್ಲಿ ${found} ವಸ್ತುಗಳನ್ನು ಕಂಡುಕೊಂಡಿದ್ದೀರಿ ಎಂದು ದಾಖಲಿಸಿದ್ದೇನೆ ಮತ್ತು ಕೊರತೆಯನ್ನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರಿಗೆ ವರದಿ ಮಾಡಿದ್ದೇನೆ.`,
+    }),
+    step5DamageLogged: (reason: string): LocalizedString => ({
+      en: `Thank you for reporting. I have recorded the damage (${reason}) and sent this case to your supervisor.`,
+      hi: `रिपोर्ट करने के लिए धन्यवाद। मैंने क्षति (${reason}) दर्ज कर ली है और यह केस आपके सुपरवाइज़र को भेज दिया है।`,
+      kn: `ವರದಿ ಮಾಡಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು. ನಾನು ಹಾನಿಯನ್ನು (${reason}) ದಾಖಲಿಸಿದ್ದೇನೆ ಮತ್ತು ಈ ಪ್ರಕರಣವನ್ನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸಿದ್ದೇನೆ.`,
+    }),
+    step5UnidentifiedSupervisorHelp: {
+      en: 'Thank you. I have notified your supervisor about this missing item.',
+      hi: 'धन्यवाद। मैंने आपके सुपरवाइज़र को इस गुम सामान के बारे में सूचित कर दिया है।',
+      kn: 'ಧನ್ಯವಾದಗಳು. ಈ ಕಾಣೆಯಾದ ವಸ್ತುವಿನ ಬಗ್ಗೆ ನಾನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರಿಗೆ ತಿಳಿಸಿದ್ದೇನೆ.',
     },
   },
 
@@ -305,9 +430,9 @@ export const PICKER_I18N = {
       kn: 'ಸೂಚನೆ ಹೇಳಲಾಗುತ್ತಿದೆ...',
     },
     escalateSupervisor: {
-      en: 'Escalate to Supervisor',
-      hi: 'सुपरवाइजर को भेजें',
-      kn: 'ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸಿ',
+      en: 'Ask Supervisor for Help',
+      hi: 'सुपरवाइज़र से मदद मांगें',
+      kn: 'ಮೇಲ್ವಿಚಾರಕರ ಸಹಾಯ ಕೇಳಿ',
     },
     reset: {
       en: 'Reset',
@@ -359,9 +484,9 @@ export const PICKER_I18N = {
     }),
 
     investigationProgress: {
-      en: 'Task assigned. Checking inventory records and recent movement activity…',
-      hi: 'टास्क असाइन हो गया। इन्वेंटरी रिकॉर्ड और हाल की मूवमेंट गतिविधि की जांच की जा रही है…',
-      kn: 'ಕಾರ್ಯ ನಿಯೋಜಿಸಲಾಗಿದೆ. ದಾಸ್ತಾನು ದಾಖಲೆಗಳು ಮತ್ತು ಇತ್ತೀಚಿನ ಚಲನೆಯ ಚಟುವಟಿಕೆಯನ್ನು ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…',
+      en: 'Checking inventory records and recent movement activity…',
+      hi: 'इन्वेंटरी रिकॉर्ड और हाल की मूवमेंट गतिविधि की जांच की जा रही है…',
+      kn: 'ದಾಸ್ತಾನು ದಾಖಲೆಗಳು ಮತ್ತು ಇತ್ತೀಚಿನ ಚಲನೆಯ ಚಟುವಟಿಕೆಯನ್ನು ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…',
     },
 
     recommendationSupported: (
@@ -370,9 +495,9 @@ export const PICKER_I18N = {
       time: string,
       landmark?: string
     ): LocalizedString => ({
-      en: `I found a scanner record indicating that this item may have moved from ${fromBin || 'the expected bin'} to ${toBin}. Please check ${toBin}${landmark ? ' ' + landmark : ''}. The item's presence has not yet been physically verified.`,
-      hi: `मुझे एक स्कैनर रिकॉर्ड मिला जिससे पता चलता है कि यह सामान ${fromBin || 'अपेक्षित बिन'} से ${toBin} में चला गया हो सकता है। कृपया ${toBin}${landmark ? ' ' + landmark : ''} चेक करें। सामान की मौजूदगी की अभी भौतिक पुष्टि नहीं हुई है।`,
-      kn: `ಈ ವಸ್ತು ${fromBin || 'ನಿರೀಕ್ಷಿತ ಬಿನ್'} ನಿಂದ ${toBin} ಗೆ ಚಲಿಸಿರಬಹುದು ಎಂದು ಸ್ಕ್ಯಾನರ್ ದಾಖಲೆ ಸೂಚಿಸುತ್ತದೆ. ದಯವಿಟ್ಟು ${toBin}${landmark ? ' ' + landmark : ''} ಪರಿಶೀಲಿಸಿ. ವಸ್ತುವಿನ ಉಪಸ್ಥಿತಿಯನ್ನು ಇನ್ನೂ ಭೌತಿಕವಾಗಿ ದೃಢೀಕರಿಸಲಾಗಿಲ್ಲ.`,
+      en: `Please check shelf ${toBin}.${landmark ? ' ' + landmark : ''}`,
+      hi: `कृपया शेल्फ़ ${toBin} देखें।${landmark ? ' ' + landmark : ''}`,
+      kn: `ದಯವಿಟ್ಟು ಶೆಲ್ಫ್ ${toBin} ಪರಿಶೀಲಿಸಿ.${landmark ? ' ' + landmark : ''}`,
     }),
 
     verificationPrompt: (recBin: string): LocalizedString => ({
@@ -388,15 +513,15 @@ export const PICKER_I18N = {
     },
 
     recommendationFoundExpected: (bin: string): LocalizedString => ({
-      en: `Inventory and dispatch records confirm this item is assigned to expected bin ${bin}. Please check bin ${bin} carefully.`,
-      hi: `इन्वेंटरी और डिस्पैच रिकॉर्ड पुष्टि करते हैं कि यह सामान अपेक्षित बिन ${bin} पर है। कृपया बिन ${bin} की अच्छी तरह से जांच करें।`,
-      kn: `ದಾಸ್ತಾನು ಮತ್ತು ರವಾನೆ ದಾಖಲೆಗಳು ಈ ವಸ್ತು ನಿರೀಕ್ಷಿತ ಬಿನ್ ${bin} ನಲ್ಲಿದೆ ಎಂದು ದೃಢೀಕರಿಸುತ್ತವೆ. ದಯವಿಟ್ಟು ಬಿನ್ ${bin} ಅನ್ನು ಎಚ್ಚರಿಕೆಯಿಂದ ಪರಿಶೀಲಿಸಿ.`,
+      en: `Please check shelf ${bin}. Look carefully around the assigned shelf.`,
+      hi: `कृपया शेल्फ़ ${bin} देखें। शेल्फ़ पर ध्यान से खोजें।`,
+      kn: `ದಯವಿಟ್ಟು ಶೆಲ್ಫ್ ${bin} ಪರಿಶೀಲಿಸಿ. ನಿಗದಿಪಡಿಸಿದ ಶೆಲ್ಫ್‌ನಲ್ಲಿ ಎಚ್ಚರಿಕೆಯಿಂದ ನೋಡಿ.`,
     }),
 
     recommendationInsufficient: {
-      en: "I couldn't find enough reliable evidence to recommend another location. I'll send this case to your supervisor for help.",
-      hi: 'मुझे किसी अन्य स्थान की सिफारिश करने के लिए पर्याप्त विश्वसनीय सबूत नहीं मिले। मैं मदद के लिए यह केस आपके सुपरवाइजर को भेजूंगा।',
-      kn: 'ಮತ್ತೊಂದು ಸ್ಥಳವನ್ನು ಶಿಫಾರಸು ಮಾಡಲು ಸಾಕಷ್ಟು ವಿಶ್ವಾಸಾರ್ಹ ಪುರಾವೆಗಳು ಸಿಗಲಿಲ್ಲ. ಸಹಾಯಕ್ಕಾಗಿ ಈ ಪ್ರಕರಣವನ್ನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸುತ್ತೇನೆ.',
+      en: 'I could not confirm where the item is. I am asking your supervisor to help.',
+      hi: 'मैं यह पुष्टि नहीं कर सका कि सामान कहाँ है। मैं आपके सुपरवाइज़र से मदद माँग रहा हूँ।',
+      kn: 'ವಸ್ತು ಎಲ್ಲಿದೆ ಎಂದು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಾನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರ ಸಹಾಯ ಕೇಳುತ್ತಿದ್ದೇನೆ.',
     },
 
     recommendationConflicting: (
@@ -405,15 +530,15 @@ export const PICKER_I18N = {
       cameraLoc: string,
       cameraTime: string
     ): LocalizedString => ({
-      en: `Conflicting movement signals detected. Scanner records show transfer toward ${scannerLoc} at ${scannerTime}, but conveyor camera footage shows movement toward ${cameraLoc} at ${cameraTime}. No single location can be reliably recommended. Case must be escalated to the supervisor.`,
-      hi: `परस्पर विरोधी मूवमेंट संकेत मिले हैं। स्कैनर रिकॉर्ड ${scannerTime} पर ${scannerLoc} दिखाता है, लेकिन कन्वेयर कैमरा ${cameraTime} पर ${cameraLoc} की ओर दिखाता है। कोई स्थान अनुशंसित नहीं किया जा सकता। केस सुपरवाइजर को भेजा जा रहा है।`,
-      kn: `ಪರಸ್ಪರ ವಿರೋಧಾತ್ಮಕ ಚಲನೆ ಸಂಕೇತಗಳು ಪತ್ತೆಯಾಗಿವೆ. ಸ್ಕ್ಯಾನರ್ ${scannerTime} ಕ್ಕೆ ${scannerLoc} ತೋರಿಸಿದರೆ, ಕ್ಯಾಮೆರಾ ${cameraTime} ಕ್ಕೆ ${cameraLoc} ತೋರಿಸುತ್ತದೆ. ಯಾವುದೇ ನಿರ್ದಿಷ್ಟ ಸ್ಥಳವನ್ನು ಶಿಫಾರಸು ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಪ್ರಕರಣವನ್ನು ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸಬೇಕು.`,
+      en: 'I could not confirm where the item is due to conflicting records. I am asking your supervisor to help.',
+      hi: 'परस्पर विरोधी रिकॉर्ड के कारण सामान का स्थान तय नहीं हो सका। मैं आपके सुपरवाइज़र से मदद माँग रहा हूँ।',
+      kn: 'ವಿರೋಧಾತ್ಮಕ ದಾಖಲೆಗಳ ಕಾರಣ ವಸ್ತು ಎಲ್ಲಿದೆ ಎಂದು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಾನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರ ಸಹಾಯ ಕೇಳುತ್ತಿದ್ದೇನೆ.',
     }),
 
     recommendationStale: (staleLoc: string, hoursOld: number = 28): LocalizedString => ({
-      en: `Movement record pointing to ${staleLoc} was found, but the record is ${hoursOld} hours old (exceeds the 2-hour freshness limit). This is stale evidence and cannot be verified as current proof. Please escalate to your supervisor or proceed with caution.`,
-      hi: `${staleLoc} का रिकॉर्ड मिला, लेकिन यह ${hoursOld} घंटे पुराना है (2 घंटे की सीमा से अधिक)। यह पुराना डेटा है और वर्तमान स्थिति की पुष्टि नहीं करता। कृपया सुपरवाइजर को भेजें।`,
-      kn: `${staleLoc} ಗೆ ಚಲನೆಯ ದಾಖಲೆ ಲಭ್ಯವಿದೆ, ಆದರೆ ಇದು ${hoursOld} ಗಂಟೆಗಳಷ್ಟು ಹಳೆಯದಾಗಿದೆ (2 ಗಂಟೆಗಳ ಮಿತಿಗಿಂತ ಹೆಚ್ಚು). ಇದು ಹಳೆಯ ಪುರಾವೆಯಾಗಿದೆ. ದಯವಿಟ್ಟು ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸಿ.`,
+      en: `Older records suggest shelf ${staleLoc}. Please check there carefully, or ask your supervisor for help.`,
+      hi: `पुराने रिकॉर्ड शेल्फ़ ${staleLoc} सुझाते हैं। कृपया वहाँ ध्यान से देखें या सुपरवाइज़र से मदद लें।`,
+      kn: `ಹಳೆಯ ದಾಖಲೆಗಳು ಶೆಲ್ಫ್ ${staleLoc} ಅನ್ನು ಸೂಚಿಸುತ್ತವೆ. ದಯವಿಟ್ಟು ಅಲ್ಲಿ ಎಚ್ಚರಿಕೆಯಿಂದ ಪರಿಶೀಲಿಸಿ.`,
     }),
 
     recommendationCamera: (
@@ -422,86 +547,70 @@ export const PICKER_I18N = {
       toBin: string,
       observation: string
     ): LocalizedString => ({
-      en: `Tier 1 scanner records were inconclusive. Evaluating Tier 2 camera evidence (${cameraName} at ${time}): observed ${observation}. Suggested location is Bay ${toBin}. Note: Camera evidence is simulated / pre-recorded; physical verification is required.`,
-      hi: `टियर 1 स्कैनर रिकॉर्ड अनिर्णायक थे। टियर 2 कैमरा साक्ष्य का मूल्यांकन (${time} पर ${cameraName}): देखा गया कि ${observation}। सुझाया गया स्थान बे ${toBin} है। नोट: कैमरा साक्ष्य सिमुलेटेड / प्री-रिकॉर्डेड है; भौतिक सत्यापन आवश्यक है।`,
-      kn: `ಶ್ರೇಣಿ 1 ಸ್ಕ್ಯಾನರ್ ದಾಖಲೆಗಳು ಅನಿರ್ಣಾಯಕವಾಗಿದ್ದವು. ಶ್ರೇಣಿ 2 ಕ್ಯಾಮೆರಾ ಪುರಾವೆಯ ಮೌಲ್ಯಮಾಪನ (${time} ರಂದು ${cameraName}): ${observation} ಕಂಡುಬಂದಿದೆ. ಸೂಚಿಸಲಾದ ಸ್ಥಳ ಬೇ ${toBin}. ಗಮನಿಸಿ: ಕ್ಯಾಮೆರಾ ಪುರಾವೆ ಸಿಮ್ಯುಲೇಟ್ / ಪೂರ್ವ-ರೆಕಾರ್ಡ್ ಮಾಡಲಾಗಿದೆ; ಭೌತಿಕ ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ.`,
+      en: `Please check shelf ${toBin}. Camera records show item moved toward this bay.`,
+      hi: `कृपया शेल्फ़ ${toBin} देखें। कैमरा रिकॉर्ड सामान यहाँ जाने का संकेत देते हैं।`,
+      kn: `ದಯವಿಟ್ಟು ಶೆಲ್ಫ್ ${toBin} ಪರಿಶೀಲಿಸಿ. ಕ್ಯಾಮೆರಾ ದಾಖಲೆಗಳು ವಸ್ತು ಇಲ್ಲಿಗೆ ಹೋಗಿರುವುದನ್ನು ತೋರಿಸುತ್ತವೆ.`,
     }),
 
     pickerFound: (loc: string): LocalizedString => ({
       en: `I found the item at ${loc}.`,
-      hi: `मुझे ${loc} पर आइटम मिल गया।`,
+      hi: `मुझे ${loc} पर सामान मिल गया।`,
       kn: `ನನಗೆ ${loc} ನಲ್ಲಿ ವಸ್ತು ಸಿಕ್ಕಿದೆ.`,
     }),
 
     pickerNotFoundRecommended: (loc: string): LocalizedString => ({
       en: `I checked ${loc}, but the item is not there either.`,
-      hi: `मैंने ${loc} चेक किया, लेकिन आइटम वहां भी नहीं है।`,
+      hi: `मैंने ${loc} देखा, लेकिन सामान वहाँ भी नहीं है।`,
       kn: `ನಾನು ${loc} ಪರಿಶೀಲಿಸಿದೆ, ಆದರೆ ವಸ್ತು ಅಲ್ಲಿಯೂ ಇಲ್ಲ.`,
     }),
 
     pickerReportedLessQty: (found: number, expected: number): LocalizedString => ({
-      en: `I only found ${found} of ${expected} units requested.`,
-      hi: `मुझे अपेक्षित ${expected} में से केवल ${found} यूनिट ही मिले।`,
-      kn: `ಕೇಳಲಾದ ${expected} ರಲ್ಲಿ ನನಗೆ ${found} ಯೂನಿಟ್‌ಗಳು ಮಾತ್ರ ಸಿಕ್ಕಿವೆ.`,
+      en: `I only found ${found} of ${expected} units.`,
+      hi: `मुझे ${expected} में से केवल ${found} सामान ही मिले।`,
+      kn: `ಕೇಳಲಾದ ${expected} ರಲ್ಲಿ ನನಗೆ ${found} ವಸ್ತುಗಳು ಮಾತ್ರ ಸಿಕ್ಕಿವೆ.`,
     }),
 
     pickerReportedDamaged: (reason: string): LocalizedString => ({
       en: `The item is damaged: ${reason}.`,
-      hi: `आइटम क्षतिग्रस्त है: ${reason}।`,
-      kn: `ವಸ್ತು ಹಾನಿಗೊಳಗಾಗಿದೆ: ${reason}.`,
+      hi: `सामान टूटा या खराब है: ${reason}।`,
+      kn: `ವಸ್ತು ಹಾಳಾಗಿದೆ: ${reason}.`,
     }),
 
     caseResolvedMessage: (loc: string): LocalizedString => ({
-      en: `Great! Physical presence verified and pick completed at ${loc}. Case marked RESOLVED in supervisor console.`,
-      hi: `बहुत बढ़िया! ${loc} पर भौतिक सत्यापन और पिक पूरा हुआ। सुपरवाइजर कंसोल में केस हल (RESOLVED) के रूप में दर्ज हुआ।`,
-      kn: `ಉತ್ತಮ! ${loc} ನಲ್ಲಿ ಭೌತಿಕ ಪರಿಶೀಲನೆ ಪೂರ್ಣಗೊಂಡಿದೆ. ಮೇಲ್ವಿಚಾರಕರ ಕನ್ಸೋಲ್‌ನಲ್ಲಿ ಪ್ರಕರಣವನ್ನು ಪರಿಹರಿಸಲಾಗಿದೆ (RESOLVED) ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ.`,
+      en: 'Thank you! I have recorded that you found it.',
+      hi: 'धन्यवाद! मैंने दर्ज कर लिया है कि आपको सामान मिल गया है।',
+      kn: 'ಧನ್ಯವಾದಗಳು! ನಿಮಗೆ ವಸ್ತು ಸಿಕ್ಕಿದೆ ಎಂದು ನಾನು ದಾಖಲಿಸಿದ್ದೇನೆ.',
     }),
 
     caseEscalatedMessage: (reason: string): LocalizedString => ({
-      en: `Case escalated to warehouse supervisor: ${reason}. Discrepancy logged for physical audit.`,
-      hi: `केस सुपरवाइजर को भेजा गया: ${reason}। भौतिक ऑडिट के लिए विसंगति दर्ज की गई।`,
-      kn: `ಪ್ರಕರಣವನ್ನು ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ: ${reason}. ಆಡಿಟ್‌ಗಾಗಿ ವ್ಯತ್ಯಾಸವನ್ನು ದಾಖಲಿಸಲಾಗಿದೆ.`,
+      en: 'Thank you for checking. I am sending this case to your supervisor.',
+      hi: 'जांच करने के लिए धन्यवाद। मैं यह केस आपके सुपरवाइज़र को भेज रहा हूँ।',
+      kn: 'ಪರಿಶೀಲಿಸಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು. ನಾನು ಈ ಪ್ರಕರಣವನ್ನು ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರಿಗೆ ಕಳುಹಿಸುತ್ತಿದ್ದೇನೆ.',
     }),
   },
 
   drawers: {
     lessQtyTitle: {
-      en: 'Report Partial Quantity',
-      hi: 'कम मात्रा की रिपोर्ट करें',
-      kn: 'ಭಾಗಶಃ ಪ್ರಮಾಣವನ್ನು ವರದಿ ಮಾಡಿ',
+      en: 'How many items did you find?',
+      hi: 'आपको कितने सामान मिले?',
+      kn: 'ನಿಮಗೆ ಎಷ್ಟು ವಸ್ತುಗಳು ಸಿಕ್ಕಿವೆ?',
     },
     lessQtyPrompt: (expected: number): LocalizedString => ({
-      en: `Enter actual quantity physically found (out of ${expected} expected):`,
-      hi: `वास्तव में मिली मात्रा दर्ज करें (अपेक्षित ${expected} में से):`,
-      kn: `ನಿಜವಾಗಿ ಸಿಕ್ಕಿದ ಪ್ರಮಾಣವನ್ನು ನಮೂದಿಸಿ (${expected} ನಿರೀಕ್ಷಿತದಲ್ಲಿ):`,
+      en: `Enter the number of items you found (expected: ${expected}):`,
+      hi: `आपको मिले सामान की संख्या लिखें (अपेक्षित: ${expected}):`,
+      kn: `ನಿಮಗೆ ಸಿಕ್ಕ ವಸ್ತುಗಳ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ (ನಿರೀಕ್ಷಿತ: ${expected}):`,
     }),
     damageTitle: {
-      en: 'Report Damaged Inventory',
-      hi: 'क्षतिग्रस्त स्टॉक की रिपोर्ट करें',
-      kn: 'ಹಾನಿಗೊಳಗಾದ ದಾಸ್ತಾನು ವರದಿ ಮಾಡಿ',
+      en: 'What is wrong with the item?',
+      hi: 'सामान में क्या खराबी है?',
+      kn: 'ವಸ್ತುವಿನಲ್ಲಿ ಏನು ಹಾನಿಯಾಗಿದೆ?',
     },
     damagePrompt: {
-      en: 'Select damage condition:',
+      en: 'Select the damage condition:',
       hi: 'क्षति की स्थिति चुनें:',
       kn: 'ಹಾನಿಯ ಸ್ಥಿತಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ:',
     },
     damageOptions: [
-      {
-        id: 'CRACKED_SEAL',
-        label: {
-          en: 'Cracked packaging / Broken seal',
-          hi: 'टूटी हुई पैकेजिंग / टूटी सील',
-          kn: 'ಒಡೆದ ಪ್ಯಾಕೇಜಿಂಗ್ / ಮುರಿದ ಸೀಲ್',
-        },
-      },
-      {
-        id: 'CRUSHED_BOX',
-        label: {
-          en: 'Crushed carton / Structural dent',
-          hi: 'दबा हुआ कार्टन / ढांचागत क्षति',
-          kn: 'ಜಜ್ಜಿದ ಕಾರ್ಟನ್ / ರಚನಾತ್ಮಕ ಹಾನಿ',
-        },
-      },
       {
         id: 'BROKEN_GLASS',
         label: {
@@ -511,11 +620,27 @@ export const PICKER_I18N = {
         },
       },
       {
+        id: 'CRUSHED_BOX',
+        label: {
+          en: 'Crushed box / packaging',
+          hi: 'दबा हुआ कार्टन / टूटी पैकेजिंग',
+          kn: 'ಜಜ್ಜಿದ ಕಾರ್ಟನ್ / ಒಡೆದ ಪ್ಯಾಕಿಂಗ್',
+        },
+      },
+      {
         id: 'WATER_DAMAGE',
         label: {
-          en: 'Water / Moisture contamination',
-          hi: 'पानी / नमी से संदूषण',
-          kn: 'ನೀರು / ತೇವಾಂಶದಿಂದ ಹಾನಿ',
+          en: 'Water / moisture damage',
+          hi: 'पानी या नमी से खराब',
+          kn: 'ನೀರು ಅಥವಾ ತೇವಾಂಶದಿಂದ ಹಾನಿ',
+        },
+      },
+      {
+        id: 'CRACKED_SEAL',
+        label: {
+          en: 'Broken seal / open package',
+          hi: 'टूटी हुई सील / खुला पैकेट',
+          kn: 'ಮುರಿದ ಸೀಲ್ / ತೆರೆದ ಪ್ಯಾಕೆಟ್',
         },
       },
     ],

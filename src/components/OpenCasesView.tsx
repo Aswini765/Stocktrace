@@ -74,7 +74,7 @@ export const OpenCasesView: React.FC<OpenCasesViewProps> = ({
             Supervisor Operational Console
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Review failed picks, evaluate 3-tier evidence, and audit human verifications across warehouse zones.
+            Review failed picks, evaluate 2-tier evidence, and audit human verifications across warehouse zones.
           </p>
         </div>
 
