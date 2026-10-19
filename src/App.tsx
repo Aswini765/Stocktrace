@@ -398,10 +398,8 @@ export default function App() {
   };
 
   // Switch to Supervisor view directly from Picker or Home
-  const handleSwitchToSupervisor = (caseId?: string) => {
-    if (caseId) {
-      setActiveCaseId(caseId);
-    }
+  const handleSwitchToSupervisor = (_caseId?: string) => {
+    setActiveCaseId(null);
     setCurrentRole('supervisor');
     setCurrentTab('open-cases');
   };
@@ -434,6 +432,7 @@ export default function App() {
             setCurrentRole(role);
             if (role === 'supervisor') {
               setCurrentTab('open-cases');
+              setActiveCaseId(null);
             }
           }}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
@@ -462,7 +461,13 @@ export default function App() {
           {/* VIEW A: HOME SCREEN / ROLE SELECTOR */}
           {currentRole === 'home' && (
             <HomeLandingView
-              onSelectRole={(role) => setCurrentRole(role)}
+              onSelectRole={(role) => {
+                setCurrentRole(role);
+                if (role === 'supervisor') {
+                  setCurrentTab('open-cases');
+                  setActiveCaseId(null);
+                }
+              }}
               openCasesCount={openCases.length}
               completedCount={completedCases.length}
               cases={cases}
@@ -485,7 +490,7 @@ export default function App() {
           {/* VIEW C: PERSONA 3 — MANAGER (ROI DASHBOARD) */}
           {currentRole === 'manager' && (
             <ManagerRoiDashboard
-              onGoToSupervisor={() => setCurrentRole('supervisor')}
+              onGoToSupervisor={() => handleSwitchToSupervisor()}
               onGoToPicker={() => setCurrentRole('picker')}
               cases={cases}
               investigations={investigations}

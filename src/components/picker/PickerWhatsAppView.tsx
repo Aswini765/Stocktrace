@@ -861,15 +861,27 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
             </span>
           </div>
 
-          <button
-            id="picker-btn-reset-demo"
-            onClick={handleResetCurrentDemo}
-            className="text-slate-500 hover:text-slate-900 text-[11px] font-semibold flex items-center space-x-1 cursor-pointer transition-colors"
-            title="Reset active scenario demo"
-          >
-            <RotateCcw className="w-3 h-3 text-slate-500" />
-            <span>{PICKER_I18N.verificationButtons.reset[selectedLang]}</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              id="picker-header-btn-supervisor"
+              onClick={() => onSwitchToSupervisor()}
+              className="text-slate-600 hover:text-slate-900 text-[11px] font-semibold flex items-center space-x-1 cursor-pointer transition-colors"
+              title="Supervisor View"
+            >
+              <span>Supervisor View</span>
+              <ExternalLink className="w-3 h-3 text-slate-400" />
+            </button>
+
+            <button
+              id="picker-btn-reset-demo"
+              onClick={handleResetCurrentDemo}
+              className="text-slate-500 hover:text-slate-900 text-[11px] font-semibold flex items-center space-x-1 cursor-pointer transition-colors"
+              title="Reset active scenario demo"
+            >
+              <RotateCcw className="w-3 h-3 text-slate-500" />
+              <span>{PICKER_I18N.verificationButtons.reset[selectedLang]}</span>
+            </button>
+          </div>
         </div>
 
         {/* 8 Clickable Scenario Pills */}
@@ -1336,7 +1348,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
 
                   <button
                     id="picker-btn-switch-supervisor"
-                    onClick={() => onSwitchToSupervisor(activeItem?.caseId)}
+                    onClick={() => onSwitchToSupervisor()}
                     className="py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl font-semibold cursor-pointer text-xs flex items-center space-x-1"
                   >
                     <span>Supervisor View</span>

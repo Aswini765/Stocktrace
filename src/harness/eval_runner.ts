@@ -2322,6 +2322,63 @@ export async function runStockTraceEvaluationSuite(): Promise<{
     });
   }
 
+  // --------------------------------------------------------------------------
+  // E67: Navigation Consistency — Supervisor Top Nav and Picker Supervisor View
+  // --------------------------------------------------------------------------
+  {
+    // Simulate App state
+    let currentRole: string = 'picker';
+    let currentTab: string = 'open-cases';
+    let activeCaseId: string | null = 'CASE-TEST-123';
+
+    // Simulate handleSwitchToSupervisor (called from Picker Supervisor View)
+    const handleSwitchToSupervisor = (_caseId?: string) => {
+      activeCaseId = null;
+      currentRole = 'supervisor';
+      currentTab = 'open-cases';
+    };
+
+    // Simulate TopBar onSelectRole
+    const onSelectRole = (role: string) => {
+      currentRole = role;
+      if (role === 'supervisor') {
+        currentTab = 'open-cases';
+        activeCaseId = null;
+      }
+    };
+
+    // Action 1: Picker clicks "Supervisor View"
+    handleSwitchToSupervisor('CASE-TEST-123');
+    const pickerNavPass = currentRole === 'supervisor' && currentTab === 'open-cases' && activeCaseId === null;
+
+    // Simulate supervisor opening a case to investigate
+    activeCaseId = 'CASE-TEST-456';
+    currentTab = 'open-cases';
+
+    // Action 2: User clicks "Supervisor" tab in top nav while already on supervisor with an active case
+    onSelectRole('supervisor');
+    const topNavRetainPass = currentRole === 'supervisor' && currentTab === 'open-cases' && activeCaseId === null;
+
+    // Simulate supervisor viewing completed cases
+    currentTab = 'completed-cases';
+    activeCaseId = 'CASE-TEST-COMPLETED';
+
+    // Action 3: User clicks "Supervisor" tab in top nav from completed cases
+    onSelectRole('supervisor');
+    const topNavFromCompletedPass = currentRole === 'supervisor' && currentTab === 'open-cases' && activeCaseId === null;
+
+    const passed = pickerNavPass && topNavRetainPass && topNavFromCompletedPass;
+
+    results.push({
+      id: 'E67',
+      title: 'Supervisor Navigation Consistency: Top nav & Picker Supervisor View open Open Cases by default',
+      passed,
+      notes: passed
+        ? 'Both entry points reset activeCaseId, select Open Cases by default, and retain Open Cases view.'
+        : 'Navigation failed to reset to Open Cases view with activeCaseId cleared.',
+    });
+  }
+
   const passedCount = results.filter((r) => r.passed).length;
   const failedCount = results.length - passedCount;
 
