@@ -35,6 +35,34 @@ export const PICKER_I18N = {
     },
   },
 
+  voiceStatus: {
+    speaking: {
+      en: 'Speaking...',
+      hi: 'बोल रहा है...',
+      kn: 'ಮಾತನಾಡುತ್ತಿದೆ...',
+    },
+    listening: {
+      en: 'Listening... speak now',
+      hi: 'सुन रहा है... अब बोलें',
+      kn: 'ಕೇಳಿಸಿಕೊಳ್ಳುತ್ತಿದೆ... ಈಗ ಮಾತನಾಡಿ',
+    },
+    ready: {
+      en: 'Voice Ready',
+      hi: 'आवाज़ तैयार है',
+      kn: 'ಧ್ವನಿ ಸಿದ್ಧವಾಗಿದೆ',
+    },
+    replayBtn: {
+      en: 'Replay audio',
+      hi: 'ऑडियो दोबारा सुनें',
+      kn: 'ಆಡಿಯೋ ಮರುಪ್ಲೇ ಮಾಡಿ',
+    },
+    micDenied: {
+      en: 'Microphone access denied. You can tap buttons or type below.',
+      hi: 'माइक्रोफ़ोन अनुमति अस्वीकृत। आप नीचे बटन दबा सकते हैं या लिख सकते हैं।',
+      kn: 'ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ನೀವು ಕೆಳಗಿನ ಬಟನ್‌ಗಳನ್ನು ಒತ್ತಬಹುದು.',
+    },
+  },
+
   // -------------------------------------------------------------------------
   // SIMPLIFIED 5-STEP WORKFLOW STRINGS (Strict Section 4 Compliance)
   // -------------------------------------------------------------------------
@@ -130,6 +158,38 @@ export const PICKER_I18N = {
       en: 'The item is damaged.',
       hi: 'सामान टूटा या खराब है।',
       kn: 'ವಸ್ತು ಹಾಳಾಗಿದೆ.',
+    },
+    step4VoiceCommandHint: {
+      en: "Tip: Say 'Found it' or 'Still missing', or tap a button below.",
+      hi: "सुझाव: 'मिल गया' या 'यहाँ नहीं है' बोलें, या नीचे बटन दबाएं।",
+      kn: "ಸಲಹೆ: 'ಸಿಕ್ಕಿದೆ' ಅಥವಾ 'ಇಲ್ಲಿಲ್ಲ' ಎಂದು ಹೇಳಿ, ಅಥವಾ ಕೆಳಗಿನ ಬಟನ್ ಒತ್ತಿರಿ.",
+    },
+    voiceStatus: {
+      speaking: {
+        en: 'Speaking...',
+        hi: 'बोल रहा है...',
+        kn: 'ಮಾತನಾಡುತ್ತಿದೆ...',
+      },
+      listening: {
+        en: 'Listening... speak now',
+        hi: 'सुन रहा है... अब बोलें',
+        kn: 'ಕೇಳಿಸಿಕೊಳ್ಳುತ್ತಿದೆ... ಈಗ ಮಾತನಾಡಿ',
+      },
+      ready: {
+        en: 'Voice Ready',
+        hi: 'आवाज़ तैयार है',
+        kn: 'ಧ್ವನಿ ಸಿದ್ಧವಾಗಿದೆ',
+      },
+      replayBtn: {
+        en: 'Replay audio',
+        hi: 'ऑडियो दोबारा सुनें',
+        kn: 'ಆಡಿಯೋ ಮರುಪ್ಲೇ ಮಾಡಿ',
+      },
+      micDenied: {
+        en: 'Microphone access denied. You can tap buttons or type below.',
+        hi: 'माइक्रोफ़ोन अनुमति अस्वीकृत। आप नीचे बटन दबा सकते हैं या लिख सकते हैं।',
+        kn: 'ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ನೀವು ಕೆಳಗಿನ ಬಟನ್‌ಗಳನ್ನು ಒತ್ತಬಹುದು.',
+      },
     },
 
     // Step 5: Explain what happens next

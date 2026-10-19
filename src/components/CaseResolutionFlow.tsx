@@ -165,7 +165,7 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
         </div>
 
         <div className="flex items-center space-x-2 text-xs">
-          {onRequestRecheck && (
+          {onRequestRecheck && caseData.status !== 'RESOLVED' && caseData.status !== 'ESCALATED' && (
             <button
               onClick={() => onRequestRecheck(caseData.id)}
               className="text-xs text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
@@ -493,105 +493,172 @@ export const CaseResolutionFlow: React.FC<CaseResolutionFlowProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Case status:</span>
-              <span className={`font-bold ${caseData.status === 'RESOLVED' ? 'text-emerald-700' : 'text-slate-900'}`}>
+              <span
+                className={`font-bold ${
+                  caseData.status === 'RESOLVED'
+                    ? 'text-emerald-700'
+                    : caseData.status === 'ESCALATED'
+                    ? 'text-rose-700'
+                    : 'text-slate-900'
+                }`}
+              >
                 {caseData.status}
               </span>
             </div>
           </div>
 
-          {/* Supervisor Decision Controls */}
-          <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
-            <span className="text-[11px] font-bold text-slate-700 block">
-              Authorized Supervisor Actions:
-            </span>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                id="btn-supervisor-confirm-found"
-                onClick={() => handleSupervisorConfirm('FOUND')}
-                className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Confirm Found</span>
-              </button>
-
-              <button
-                id="btn-supervisor-mark-not-found"
-                onClick={() => handleSupervisorConfirm('NOT_FOUND')}
-                className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>Mark Not Found</span>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between pt-1 text-[11px]">
-              <button
-                onClick={() => setSubAction(subAction === 'PARTIALLY_FOUND' ? null : 'PARTIALLY_FOUND')}
-                className="text-slate-600 hover:text-slate-900 underline cursor-pointer"
-              >
-                Log partial count
-              </button>
-              <button
-                onClick={() => handleSupervisorConfirm('DAMAGED')}
-                className="text-slate-600 hover:text-slate-900 underline cursor-pointer"
-              >
-                Log damaged stock
-              </button>
-              <button
-                onClick={() => setSubAction(subAction === 'ESCALATE_CUSTOM' ? null : 'ESCALATE_CUSTOM')}
-                className="text-rose-600 hover:text-rose-900 underline cursor-pointer"
-              >
-                Escalate case
-              </button>
-            </div>
-
-            {/* Sub-form: Partial count */}
-            {subAction === 'PARTIALLY_FOUND' && (
-              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 mt-2">
-                <span className="text-[11px] font-semibold text-slate-700 block">
-                  Audited count physically present:
-                </span>
-                <div className="flex space-x-1.5">
-                  <input
-                    type="number"
-                    min="1"
-                    max={caseData.qty}
-                    value={customQty}
-                    onChange={(e) => setCustomQty(Number(e.target.value))}
-                    className="w-16 px-2 py-1 border border-slate-300 rounded font-mono text-xs bg-white"
-                  />
-                  <button
-                    onClick={() => handleSupervisorConfirm('PARTIALLY_FOUND', customQty)}
-                    className="flex-1 py-1 bg-slate-900 text-white rounded text-xs font-semibold cursor-pointer"
-                  >
-                    Confirm {customQty} Units
-                  </button>
+          {/* Supervisor Decision Controls or Completed State */}
+          {caseData.status === 'RESOLVED' ? (
+            <div className="pt-2 border-t border-slate-100 space-y-3 text-xs">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg space-y-2">
+                <div className="flex items-center space-x-1.5 text-emerald-800 font-bold text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Case Resolved &amp; Completed</span>
                 </div>
+                <p className="text-[11px] text-emerald-900 leading-relaxed">
+                  Physical human verification confirmed at <strong className="font-mono font-bold text-emerald-950">{caseData.foundLocation || caseData.recommendedLocation || caseData.expectedLocation}</strong>. Case is closed and logged in Completed Cases.
+                </p>
+                {caseData.completedAt && (
+                  <div className="text-[10px] text-emerald-700 font-mono">
+                    Completed at: {caseData.completedAt}
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Sub-form: Custom Escalation */}
-            {subAction === 'ESCALATE_CUSTOM' && (
-              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg space-y-1.5 mt-2">
-                <span className="text-[11px] font-semibold text-rose-900 block">
-                  Reason for supervisor escalation:
-                </span>
-                <input
-                  type="text"
-                  value={escalationReason}
-                  onChange={(e) => setEscalationReason(e.target.value)}
-                  className="w-full px-2 py-1 border border-rose-300 rounded text-xs bg-white text-slate-800"
-                />
+              <div className="pt-1 flex items-center justify-between">
                 <button
-                  onClick={() => handleSupervisorConfirm('NOT_FOUND', undefined, escalationReason)}
-                  className="w-full py-1 bg-rose-700 text-white rounded text-xs font-semibold cursor-pointer"
+                  id="btn-return-open-cases"
+                  onClick={onBackToOpenCases}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-semibold inline-flex items-center space-x-1 cursor-pointer transition-colors"
                 >
-                  Confirm Escalation
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Return to Case List</span>
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          ) : caseData.status === 'ESCALATED' ? (
+            <div className="pt-2 border-t border-slate-100 space-y-3 text-xs">
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg space-y-2">
+                <div className="flex items-center space-x-1.5 text-rose-800 font-bold text-xs">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Case Escalated to Inventory Control</span>
+                </div>
+                <p className="text-[11px] text-rose-900 leading-relaxed">
+                  Item physically verified absent or discrepancy logged. Handed off to supervisor for cycle recount / inventory audit.
+                </p>
+                {caseData.pickerNotes && (
+                  <div className="text-[11px] text-rose-800 bg-white/70 p-1.5 rounded border border-rose-200/60">
+                    <span className="font-semibold block text-[10px] text-rose-600 uppercase">Reason:</span>
+                    {caseData.pickerNotes}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-1 flex items-center justify-between">
+                <button
+                  id="btn-return-open-cases"
+                  onClick={onBackToOpenCases}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-semibold inline-flex items-center space-x-1 cursor-pointer transition-colors"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Return to Case List</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
+              <span className="text-[11px] font-bold text-slate-700 block">
+                Authorized Supervisor Actions:
+              </span>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  id="btn-supervisor-confirm-found"
+                  onClick={() => handleSupervisorConfirm('FOUND')}
+                  className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Confirm Found</span>
+                </button>
+
+                <button
+                  id="btn-supervisor-mark-not-found"
+                  onClick={() => handleSupervisorConfirm('NOT_FOUND')}
+                  className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Mark Not Found</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-1 text-[11px]">
+                <button
+                  onClick={() => setSubAction(subAction === 'PARTIALLY_FOUND' ? null : 'PARTIALLY_FOUND')}
+                  className="text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                >
+                  Log partial count
+                </button>
+                <button
+                  onClick={() => handleSupervisorConfirm('DAMAGED')}
+                  className="text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                >
+                  Log damaged stock
+                </button>
+                <button
+                  onClick={() => setSubAction(subAction === 'ESCALATE_CUSTOM' ? null : 'ESCALATE_CUSTOM')}
+                  className="text-rose-600 hover:text-rose-900 underline cursor-pointer"
+                >
+                  Escalate case
+                </button>
+              </div>
+
+              {/* Sub-form: Partial count */}
+              {subAction === 'PARTIALLY_FOUND' && (
+                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 mt-2">
+                  <span className="text-[11px] font-semibold text-slate-700 block">
+                    Audited count physically present:
+                  </span>
+                  <div className="flex space-x-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      max={caseData.qty}
+                      value={customQty}
+                      onChange={(e) => setCustomQty(Number(e.target.value))}
+                      className="w-16 px-2 py-1 border border-slate-300 rounded font-mono text-xs bg-white"
+                    />
+                    <button
+                      onClick={() => handleSupervisorConfirm('PARTIALLY_FOUND', customQty)}
+                      className="flex-1 py-1 bg-slate-900 text-white rounded text-xs font-semibold cursor-pointer"
+                    >
+                      Confirm {customQty} Units
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-form: Custom Escalation */}
+              {subAction === 'ESCALATE_CUSTOM' && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg space-y-1.5 mt-2">
+                  <span className="text-[11px] font-semibold text-rose-900 block">
+                    Reason for supervisor escalation:
+                  </span>
+                  <input
+                    type="text"
+                    value={escalationReason}
+                    onChange={(e) => setEscalationReason(e.target.value)}
+                    className="w-full px-2 py-1 border border-rose-300 rounded text-xs bg-white text-slate-800"
+                  />
+                  <button
+                    onClick={() => handleSupervisorConfirm('NOT_FOUND', undefined, escalationReason)}
+                    className="w-full py-1 bg-rose-700 text-white rounded text-xs font-semibold cursor-pointer"
+                  >
+                    Confirm Escalation
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -126,6 +126,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
   // Audio speech synthesis
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [activeSpeechText, setActiveSpeechText] = useState<string>('');
+  const lastSpokenIdRef = useRef<string>('');
 
   // Modals for Step 4 Follow-up (Fewer items & Damaged items)
   const [showFewerModal, setShowFewerModal] = useState<boolean>(false);
@@ -164,17 +165,90 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, step, showFewerModal, showDamageModal]);
 
-  // Keep speech text synced with language switches
+  // Audio speech playback helper
+  const handlePlayAudio = (textToPlay?: string, langOverride?: PickerLang) => {
+    const text = textToPlay || activeSpeechText;
+    if (!text) return;
+
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setIsPlayingAudio(true);
+      setTimeout(() => setIsPlayingAudio(false), 2000);
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      const lang = langOverride || selectedLang;
+
+      if (lang === 'hi') {
+        utterance.lang = 'hi-IN';
+      } else if (lang === 'kn') {
+        utterance.lang = 'kn-IN';
+      } else {
+        utterance.lang = 'en-IN';
+      }
+
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+
+      utterance.onstart = () => setIsPlayingAudio(true);
+      utterance.onend = () => setIsPlayingAudio(false);
+      utterance.onerror = () => setIsPlayingAudio(false);
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setIsPlayingAudio(false);
+    }
+  };
+
+  // Automatic spoken responses for picker workflow (Mandatory Priority 1)
   useEffect(() => {
-    if (step === 'welcome') {
-      setActiveSpeechText(PICKER_I18N.steps.step1AskMissing[selectedLang]);
+    if (step === 'welcome' && messages.length === 0) {
+      const welcomeText = PICKER_I18N.steps.step1AskMissing[selectedLang];
+      setActiveSpeechText(welcomeText);
+      const token = `welcome-${selectedLang}`;
+      if (lastSpokenIdRef.current !== token) {
+        lastSpokenIdRef.current = token;
+        handlePlayAudio(welcomeText, selectedLang);
+      }
     } else if (messages.length > 0) {
       const lastSys = [...messages].reverse().find((m) => m.sender === 'system');
-      if (lastSys) {
+      if (lastSys && lastSpokenIdRef.current !== lastSys.id) {
+        lastSpokenIdRef.current = lastSys.id;
         setActiveSpeechText(lastSys.text);
+        handlePlayAudio(lastSys.text, selectedLang);
       }
     }
-  }, [selectedLang, step, messages]);
+  }, [messages, step, selectedLang]);
+
+  // Handle language switch with immediate voice greeting in the new language
+  const handleSelectLanguage = (newLang: PickerLang) => {
+    setSelectedLang(newLang);
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    const token = `lang-change-${newLang}-${step}-${Date.now()}`;
+    lastSpokenIdRef.current = token;
+
+    let textToSpeak = '';
+    if (step === 'welcome') {
+      textToSpeak = PICKER_I18N.steps.step1AskMissing[newLang];
+    } else if (step === 'confirming_item') {
+      textToSpeak = PICKER_I18N.steps.step2MultipleMatches[newLang];
+    } else if (step === 'checking_shelf') {
+      textToSpeak = PICKER_I18N.steps.step3LookingPrompt[newLang];
+    } else if (step === 'resolved') {
+      textToSpeak = PICKER_I18N.steps.step5ThankYouFound[newLang];
+    } else if (step === 'escalated') {
+      textToSpeak = PICKER_I18N.steps.step5ThankYouNotFound[newLang];
+    } else {
+      textToSpeak = PICKER_I18N.steps.step1AskMissing[newLang];
+    }
+
+    setActiveSpeechText(textToSpeak);
+    handlePlayAudio(textToSpeak, newLang);
+  };
 
   // =========================================================================
   // RESET WORKFLOW
@@ -199,7 +273,10 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
     setActiveItem(null);
     setMessages([]);
     setStep('welcome');
-    setActiveSpeechText(PICKER_I18N.steps.step1AskMissing[selectedLang]);
+    lastSpokenIdRef.current = `reset-${Date.now()}`;
+    const welcome = PICKER_I18N.steps.step1AskMissing[selectedLang];
+    setActiveSpeechText(welcome);
+    handlePlayAudio(welcome, selectedLang);
   };
 
   const handleSelectScenario = (scenarioId: string) => {
@@ -215,40 +292,8 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
   };
 
   // =========================================================================
-  // AUDIO & VOICE CAPABILITIES
+  // AUDIO & VOICE CAPABILITIES (Recognition & Commands)
   // =========================================================================
-  const handlePlayAudio = (textToPlay?: string) => {
-    const text = textToPlay || activeSpeechText;
-    if (!text) return;
-
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      setIsPlayingAudio(true);
-      setTimeout(() => setIsPlayingAudio(false), 2000);
-      return;
-    }
-
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-
-      if (selectedLang === 'hi') {
-        utterance.lang = 'hi-IN';
-      } else if (selectedLang === 'kn') {
-        utterance.lang = 'kn-IN';
-      } else {
-        utterance.lang = 'en-IN';
-      }
-
-      utterance.onstart = () => setIsPlayingAudio(true);
-      utterance.onend = () => setIsPlayingAudio(false);
-      utterance.onerror = () => setIsPlayingAudio(false);
-
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setIsPlayingAudio(false);
-    }
-  };
-
   const handleToggleSpeech = () => {
     if (isRecordingSpeech) {
       if (recognitionRef.current) {
@@ -266,7 +311,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 
     if (!SpeechRecognitionClass) {
-      setSpeechError(PICKER_I18N.voiceModal.speechNotSupported[selectedLang]);
+      setSpeechError(PICKER_I18N.steps.voiceStatus.micDenied[selectedLang]);
       return;
     }
 
@@ -290,14 +335,82 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
-        if (transcript) {
-          setInputText(transcript);
+        if (!transcript) return;
+        const lower = transcript.toLowerCase().trim();
+
+        // Voice Command Recognition in Step 4 (Checking shelf)
+        if (step === 'checking_shelf') {
+          // Voice Command: Found
+          if (
+            lower.includes('found') ||
+            lower.includes('mil gaya') ||
+            lower.includes('mil gya') ||
+            lower.includes('sikkide') ||
+            lower.includes('ಸಿಕ್ಕಿದೆ') ||
+            lower.includes('मिल गया') ||
+            lower.includes('got it')
+          ) {
+            handleVerifyFound();
+            try { recognition.stop(); } catch {}
+            return;
+          }
+          // Voice Command: Still missing / Not here
+          if (
+            lower.includes('not here') ||
+            lower.includes('missing') ||
+            lower.includes('not found') ||
+            lower.includes('nahi mila') ||
+            lower.includes('nahin mila') ||
+            lower.includes('illilla') ||
+            lower.includes('ಇಲ್ಲಿಲ್ಲ') ||
+            lower.includes('यहाँ नहीं है')
+          ) {
+            handleVerifyNotFound();
+            try { recognition.stop(); } catch {}
+            return;
+          }
+          // Voice Command: Fewer
+          if (
+            lower.includes('fewer') ||
+            lower.includes('less') ||
+            lower.includes('kam') ||
+            lower.includes('कम') ||
+            lower.includes('kadime') ||
+            lower.includes('ಕಡಿಮೆ')
+          ) {
+            setFewerFoundCount(activeItem ? Math.max(1, Math.floor(activeItem.requiredQty / 2)) : 1);
+            setShowFewerModal(true);
+            try { recognition.stop(); } catch {}
+            return;
+          }
+          // Voice Command: Damaged
+          if (
+            lower.includes('damage') ||
+            lower.includes('broken') ||
+            lower.includes('kharab') ||
+            lower.includes('खराब') ||
+            lower.includes('टूटा') ||
+            lower.includes('halagide') ||
+            lower.includes('ಹಾಳಾಗಿದೆ')
+          ) {
+            setShowDamageModal(true);
+            try { recognition.stop(); } catch {}
+            return;
+          }
+        }
+
+        // Voice Input for reporting missing item (Step 1)
+        setInputText(transcript);
+        if (event.results[0] && event.results[0].isFinal && step === 'welcome') {
+          handleSubmitMissingReport(transcript);
         }
       };
       recognition.onerror = (event: any) => {
         setIsRecordingSpeech(false);
-        if (event.error !== 'no-speech') {
-          setSpeechError(`Notice: ${event.error}. Please type below.`);
+        if (event.error === 'not-allowed') {
+          setSpeechError(PICKER_I18N.steps.voiceStatus.micDenied[selectedLang]);
+        } else if (event.error !== 'no-speech') {
+          setSpeechError(`Notice: ${event.error}. Please type or tap buttons.`);
         }
       };
       recognition.onend = () => setIsRecordingSpeech(false);
@@ -306,7 +419,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
       recognition.start();
     } catch {
       setIsRecordingSpeech(false);
-      setSpeechError(PICKER_I18N.voiceModal.speechNotSupported[selectedLang]);
+      setSpeechError(PICKER_I18N.steps.voiceStatus.micDenied[selectedLang]);
     }
   };
 
@@ -438,31 +551,45 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
     let isRefusal = false;
     let landmarkText = order.locationDescription || order.landmarkHint;
 
-    try {
-      // Find matching demo scenario or inspect available movement records
-      const sc = DEMO_SCENARIOS.find((s) => s.sku === order.sku) || currentScenario;
-      const invRes = executeScenarioInvestigation(sc);
-      const evalState = invRes.evaluation;
-
-      if (sc.expectedOutcomeType === 'FOUND_EXPECTED') {
-        recommendedBin = order.expectedBin;
-      } else if (
-        sc.expectedOutcomeType === 'INSUFFICIENT' ||
-        sc.expectedOutcomeType === 'CONFLICTING' ||
-        evalState.confidenceState === 'INSUFFICIENT_EVIDENCE' ||
-        evalState.confidenceState === 'CONFLICTING'
-      ) {
-        isRefusal = true;
-        recommendedBin = null;
-      } else if (sc.expectedOutcomeType === 'STALE') {
-        recommendedBin = 'D04';
-      } else if (sc.expectedOutcomeType === 'TIER_2_CAMERA') {
-        recommendedBin = 'E14';
-      } else {
-        recommendedBin = evalState.topCandidate?.location || 'B07';
-      }
-    } catch {
+    if (order.sku === 'SKU-2045') {
+      recommendedBin = 'B03';
+      landmarkText = 'Near the charging dock aisle, bay B03';
+    } else if (order.sku === 'SKU-2101') {
       recommendedBin = order.expectedBin;
+      landmarkText = 'Mobile accessories aisle, bay C08';
+    } else if (order.sku === 'SKU-2201') {
+      recommendedBin = 'A08';
+      landmarkText = 'Cable accessories bin A08';
+    } else if (order.sku === 'SKU-2301') {
+      isRefusal = true;
+      recommendedBin = null;
+    } else {
+      try {
+        // Find matching demo scenario or inspect available movement records
+        const sc = DEMO_SCENARIOS.find((s) => s.sku === order.sku) || currentScenario;
+        const invRes = executeScenarioInvestigation(sc);
+        const evalState = invRes.evaluation;
+
+        if (sc.expectedOutcomeType === 'FOUND_EXPECTED') {
+          recommendedBin = order.expectedBin;
+        } else if (
+          sc.expectedOutcomeType === 'INSUFFICIENT' ||
+          sc.expectedOutcomeType === 'CONFLICTING' ||
+          evalState.confidenceState === 'INSUFFICIENT_EVIDENCE' ||
+          evalState.confidenceState === 'CONFLICTING'
+        ) {
+          isRefusal = true;
+          recommendedBin = null;
+        } else if (sc.expectedOutcomeType === 'STALE') {
+          recommendedBin = 'D04';
+        } else if (sc.expectedOutcomeType === 'TIER_2_CAMERA') {
+          recommendedBin = 'E14';
+        } else {
+          recommendedBin = evalState.topCandidate?.location || 'B07';
+        }
+      } catch {
+        recommendedBin = order.expectedBin;
+      }
     }
 
     setActiveItem({
@@ -791,18 +918,37 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
             </div>
           </div>
 
-          {/* Audio Speaker Listen Action */}
-          <button
-            id="picker-btn-play-voice"
-            onClick={() => handlePlayAudio()}
-            className={`p-2 rounded-full transition-colors cursor-pointer ${
-              isPlayingAudio ? 'bg-emerald-600 text-white animate-pulse' : 'bg-emerald-700/60 hover:bg-emerald-700 text-emerald-100'
-            }`}
-            title="Listen to instruction aloud"
-            aria-label="Listen aloud"
-          >
-            <Volume2 className="w-4 h-4" />
-          </button>
+          {/* Audio Speaker & Status Pill */}
+          <div className="flex items-center space-x-1.5">
+            {isPlayingAudio && (
+              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-100 text-[10px] font-semibold animate-pulse border border-emerald-400/30">
+                <Volume2 className="w-3 h-3 text-emerald-200" />
+                <span>{PICKER_I18N.steps.voiceStatus.speaking[selectedLang]}</span>
+              </span>
+            )}
+            {isRecordingSpeech && (
+              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-100 text-[10px] font-semibold animate-pulse border border-rose-400/30">
+                <Mic className="w-3 h-3 text-rose-200" />
+                <span>{PICKER_I18N.steps.voiceStatus.listening[selectedLang]}</span>
+              </span>
+            )}
+            {!isPlayingAudio && !isRecordingSpeech && (
+              <span className="hidden sm:inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-200 text-[10px] font-medium border border-emerald-700/50">
+                <span>{PICKER_I18N.steps.voiceStatus.ready[selectedLang]}</span>
+              </span>
+            )}
+            <button
+              id="picker-btn-play-voice"
+              onClick={() => handlePlayAudio()}
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
+                isPlayingAudio ? 'bg-emerald-600 text-white animate-pulse' : 'bg-emerald-700/60 hover:bg-emerald-700 text-emerald-100'
+              }`}
+              title={PICKER_I18N.steps.voiceStatus.replayBtn[selectedLang]}
+              aria-label={PICKER_I18N.steps.voiceStatus.replayBtn[selectedLang]}
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Language Strip (English, Hindi, Kannada) */}
@@ -811,7 +957,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
           <div className="inline-flex rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs">
             <button
               id="picker-lang-en"
-              onClick={() => setSelectedLang('en')}
+              onClick={() => handleSelectLanguage('en')}
               className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${
                 selectedLang === 'en'
                   ? 'bg-slate-900 text-white shadow-2xs'
@@ -822,7 +968,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
             </button>
             <button
               id="picker-lang-hi"
-              onClick={() => setSelectedLang('hi')}
+              onClick={() => handleSelectLanguage('hi')}
               className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${
                 selectedLang === 'hi'
                   ? 'bg-slate-900 text-white shadow-2xs'
@@ -833,7 +979,7 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
             </button>
             <button
               id="picker-lang-kn"
-              onClick={() => setSelectedLang('kn')}
+              onClick={() => handleSelectLanguage('kn')}
               className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${
                 selectedLang === 'kn'
                   ? 'bg-slate-900 text-white shadow-2xs'
@@ -1008,7 +1154,19 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
                         <span className="font-semibold">
                           {isSystem ? 'StockTrace' : 'You'}
                         </span>
-                        <span>{msg.timestamp}</span>
+                        <div className="flex items-center space-x-1.5">
+                          {isSystem && (
+                            <button
+                              onClick={() => handlePlayAudio(msg.text)}
+                              className="p-0.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                              title={PICKER_I18N.steps.voiceStatus.replayBtn[selectedLang]}
+                              aria-label={PICKER_I18N.steps.voiceStatus.replayBtn[selectedLang]}
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <span>{msg.timestamp}</span>
+                        </div>
                       </div>
 
                       <p className="text-xs sm:text-sm font-medium leading-relaxed">
@@ -1091,9 +1249,32 @@ export const PickerWhatsAppView: React.FC<PickerWhatsAppViewProps> = ({
             {/* (Only visible when Step 3 is completed & checking shelf) */}
             {/* ============================================================= */}
             {step === 'checking_shelf' && (
-              <div className="p-3 bg-white border-t border-slate-200 space-y-2 shadow-lg">
+              <div className="p-3 bg-white border-t border-slate-200 space-y-2.5 shadow-lg">
                 <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide text-center">
                   {PICKER_I18N.steps.step3LookingPrompt[selectedLang]}
+                </div>
+
+                {/* Voice command guidance & Mic trigger */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between text-xs text-emerald-950 shadow-2xs">
+                  <div className="flex items-center space-x-2 truncate">
+                    <Volume2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span className="text-[11px] font-medium truncate">
+                      {PICKER_I18N.steps.step4VoiceCommandHint[selectedLang]}
+                    </span>
+                  </div>
+                  <button
+                    id="picker-btn-voice-command-step4"
+                    onClick={handleToggleSpeech}
+                    className={`ml-2 px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 cursor-pointer shrink-0 transition-all ${
+                      isRecordingSpeech
+                        ? 'bg-rose-600 text-white animate-pulse shadow-xs'
+                        : 'bg-white border border-emerald-300 text-emerald-900 hover:bg-emerald-100 shadow-2xs'
+                    }`}
+                    title={isRecordingSpeech ? 'Listening...' : 'Click to speak answer'}
+                  >
+                    <Mic className={`w-3.5 h-3.5 ${isRecordingSpeech ? 'text-white' : 'text-emerald-700'}`} />
+                    <span>{isRecordingSpeech ? 'Listening' : 'Speak'}</span>
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

@@ -215,9 +215,17 @@ export default function App() {
       setResolutionNotice(
         `⚠ ${details.sku} logged as DAMAGED. Case escalated for supervisor inventory inspection.`
       );
+    } else if (details.outcome === 'NOT_FOUND') {
+      setResolutionNotice(
+        `⚠ ${details.sku} verified missing: Item confirmed absent and case escalated to Inventory Control.`
+      );
     } else {
       setResolutionNotice(`⚠ ${details.sku} escalated to Warehouse Supervisor review.`);
     }
+
+    const auditActor = details.evidence?.includes('Picker')
+      ? 'Floor Picker #12'
+      : 'Warehouse Supervisor';
 
     // Update case in state (strictly match caseId first)
     setCases((prev) =>
@@ -246,7 +254,7 @@ export default function App() {
                 {
                   id: `AUD-${Date.now()}`,
                   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  actor: details.status === 'Resolved' ? 'Picker #12' : 'Supervisor / Associate',
+                  actor: auditActor,
                   action: details.status === 'Resolved' ? 'PHYSICAL_VERIFICATION_FOUND' : 'EXCEPTION_VERIFIED_ESCALATED',
                   details: details.discrepancyReason || `Verified outcome: ${details.outcome || 'NOT_FOUND'}`,
                   tierUsed: c.evidenceTierUsed,
@@ -510,14 +518,34 @@ export default function App() {
 
               {/* TAB 2: COMPLETED CASES */}
               {currentTab === 'completed-cases' && (
-                <CompletedCasesView
-                  cases={cases}
-                  onReopenCase={(c) => {
-                    handleResetCase(c.id);
-                    handleOpenCase(c);
-                  }}
-                  onBackToOpenCases={() => setCurrentTab('open-cases')}
-                />
+                activeCase ? (
+                  <CaseResolutionFlow
+                    caseData={activeCase}
+                    scenario={currentScenario}
+                    onCompleteResolution={handleCompleteResolution}
+                    onBackToOpenCases={() => {
+                      setActiveCaseId(null);
+                      setCurrentTab('completed-cases');
+                    }}
+                    onResetCase={() => handleResetCase(activeCase.id)}
+                    onRequestRecheck={handleRequestRecheck}
+                  />
+                ) : (
+                  <CompletedCasesView
+                    cases={cases}
+                    onViewCase={(c) => {
+                      setActiveCaseId(c.id);
+                    }}
+                    onReopenCase={(c) => {
+                      handleResetCase(c.id);
+                      handleOpenCase(c);
+                    }}
+                    onBackToOpenCases={() => {
+                      setActiveCaseId(null);
+                      setCurrentTab('open-cases');
+                    }}
+                  />
+                )
               )}
 
               {/* TAB 3: SUPERVISOR DASHBOARD */}

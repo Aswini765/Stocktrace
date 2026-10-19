@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Layers, Check, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Layers, Check, ArrowLeft, Eye } from 'lucide-react';
 import { FailedPickCase } from '../types';
 
 interface CompletedCasesViewProps {
   cases: FailedPickCase[];
   onBackToOpenCases?: () => void;
+  onViewCase?: (c: FailedPickCase) => void;
   onReopenCase?: (c: FailedPickCase) => void;
 }
 
 export const CompletedCasesView: React.FC<CompletedCasesViewProps> = ({
   cases,
   onBackToOpenCases,
+  onViewCase,
   onReopenCase,
 }) => {
   const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
@@ -113,6 +115,17 @@ export const CompletedCasesView: React.FC<CompletedCasesViewProps> = ({
 
                   {/* Actions & Expand */}
                   <div className="flex items-center space-x-2 shrink-0">
+                    {onViewCase && (
+                      <button
+                        id={`btn-review-completed-${c.sku.toLowerCase()}`}
+                        onClick={() => onViewCase(c)}
+                        className="text-xs text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 font-semibold px-2.5 py-1 rounded cursor-pointer transition-colors inline-flex items-center space-x-1"
+                        title="Review completed case and evidence chain"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>Review</span>
+                      </button>
+                    )}
                     {onReopenCase && (
                       <button
                         onClick={() => onReopenCase(c)}

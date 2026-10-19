@@ -5,6 +5,7 @@ export interface DispatchOrder {
   orderId: string;
   sku: string;
   itemName: string;
+  category?: string;
   requiredQuantity: number;
   expectedBin: string;
   locationDescription: string;
@@ -43,10 +44,117 @@ export const UNIDENTIFIED_DISPATCH_ORDER: DispatchOrder = {
 };
 
 export const WAREHOUSE_DISPATCH_ORDERS: DispatchOrder[] = [
+  // --- REALISTIC COMMON WAREHOUSE PRODUCTS (Priority 3) ---
+  {
+    orderId: 'ORD-88210',
+    sku: 'SKU-2045',
+    itemName: 'Fast USB-C Phone Charger 65W',
+    category: 'Phone Chargers',
+    requiredQuantity: 4,
+    expectedBin: 'A15',
+    locationDescription: 'Near the charging dock aisle, bay A15',
+    destinationTote: 'TOTE-22',
+    itemValue: 1250,
+    landmarkHint: 'Near the charging dock aisle, bay A15',
+    keywords: ['fast charger', 'phone charger', 'usb-c charger', '65w charger', 'wall charger', 'charger', 'फास्ट चार्जर', 'फोन चार्जर', 'चार्जर', 'ಫೋನ್ ಚಾರ್ಜರ್', 'ಚಾರ್ಜರ್'],
+  },
+  {
+    orderId: 'ORD-88211',
+    sku: 'SKU-2046',
+    itemName: 'Multi-Port USB Travel Charger 30W',
+    category: 'Phone Chargers',
+    requiredQuantity: 2,
+    expectedBin: 'A18',
+    locationDescription: 'Mobile accessories rack A18',
+    destinationTote: 'TOTE-25',
+    itemValue: 850,
+    landmarkHint: 'Mobile accessories rack A18',
+    keywords: ['travel charger', 'multi-port charger', 'usb charger', '30w charger', 'phone charger', 'mobile charger', 'charger', 'चार्जर', 'ಚಾರ್ಜರ್'],
+  },
+  {
+    orderId: 'ORD-88215',
+    sku: 'SKU-2101',
+    itemName: 'Shockproof Silicone Phone Cover (Clear)',
+    category: 'Phone Covers',
+    requiredQuantity: 5,
+    expectedBin: 'C08',
+    locationDescription: 'Mobile accessories aisle, bay C08',
+    destinationTote: 'TOTE-40',
+    itemValue: 450,
+    landmarkHint: 'Mobile accessories aisle, bay C08',
+    keywords: ['phone cover', 'silicone cover', 'clear cover', 'phone case', 'cover', 'case', 'फोन कवर', 'कवर', 'ಫೋನ್ ಕವರ್', 'ಕವರ್'],
+  },
+  {
+    orderId: 'ORD-88216',
+    sku: 'SKU-2102',
+    itemName: 'Heavy-Duty Armor Protective Phone Cover (Black)',
+    category: 'Phone Covers',
+    requiredQuantity: 3,
+    expectedBin: 'C09',
+    locationDescription: 'Mobile accessories aisle, bay C09',
+    destinationTote: 'TOTE-41',
+    itemValue: 650,
+    landmarkHint: 'Mobile accessories aisle, bay C09',
+    keywords: ['phone cover', 'armor cover', 'protective cover', 'phone case', 'cover', 'case', 'फोन कवर', 'कवर', 'ಫೋನ್ ಕವರ್'],
+  },
+  {
+    orderId: 'ORD-88225',
+    sku: 'SKU-2201',
+    itemName: 'Braided Fast-Charging USB-C Cable (2m)',
+    category: 'USB Cables',
+    requiredQuantity: 6,
+    expectedBin: 'B09',
+    locationDescription: 'Cable accessories bin B09',
+    destinationTote: 'TOTE-18',
+    itemValue: 350,
+    landmarkHint: 'Cable accessories bin B09',
+    keywords: ['usb cable', 'charging cable', 'usb-c cable', 'braided cable', 'cable', 'यूएसबी केबल', 'केबल', 'ಯುಎಸ್‌ಬಿ ಕೇಬಲ್', 'ಕೇಬಲ್'],
+  },
+  {
+    orderId: 'ORD-88226',
+    sku: 'SKU-2202',
+    itemName: 'Lightning to USB-A Charging Cable (1m)',
+    category: 'USB Cables',
+    requiredQuantity: 4,
+    expectedBin: 'B10',
+    locationDescription: 'Cable accessories bin B10',
+    destinationTote: 'TOTE-21',
+    itemValue: 400,
+    landmarkHint: 'Cable accessories bin B10',
+    keywords: ['lightning cable', 'apple cable', 'usb cable', 'charging cable', 'केबल', 'ಕೇಬಲ್'],
+  },
+  {
+    orderId: 'ORD-88230',
+    sku: 'SKU-2301',
+    itemName: 'Wireless Bluetooth Noise-Cancelling Earphones',
+    category: 'Earphones',
+    requiredQuantity: 2,
+    expectedBin: 'D02',
+    locationDescription: 'High-value consumer audio rack D02',
+    destinationTote: 'TOTE-31',
+    itemValue: 3500,
+    landmarkHint: 'High-value consumer audio rack D02',
+    keywords: ['earphones', 'wireless earphones', 'bluetooth earphones', 'earbuds', 'इयरफ़ोन', 'ಇಯರ್‌ಫೋನ್'],
+  },
+  {
+    orderId: 'ORD-88231',
+    sku: 'SKU-2302',
+    itemName: 'In-Ear Wired USB-C Earbuds with Mic',
+    category: 'Earphones',
+    requiredQuantity: 5,
+    expectedBin: 'D03',
+    locationDescription: 'Consumer audio rack D03',
+    destinationTote: 'TOTE-32',
+    itemValue: 950,
+    landmarkHint: 'Consumer audio rack D03',
+    keywords: ['earbuds', 'wired earbuds', 'wired earphones', 'earphones', 'इयरफ़ोन', 'ಇಯರ್‌ಫೋನ್'],
+  },
+  // --- EXISTING CORE WAREHOUSE INVENTORY ---
   {
     orderId: 'ORD-88201',
     sku: 'SKU-1042',
     itemName: 'Wireless Adapter Dual-Band',
+    category: 'Wireless Adapters',
     requiredQuantity: 5,
     expectedBin: 'A12',
     locationDescription: 'Near the blue rack, bottom shelf (Level 1)',
@@ -60,6 +168,7 @@ export const WAREHOUSE_DISPATCH_ORDERS: DispatchOrder[] = [
     orderId: 'ORD-88201',
     sku: 'SKU-1042',
     itemName: 'Wireless Adapter Dual-Band',
+    category: 'Wireless Adapters',
     requiredQuantity: 5,
     expectedBin: 'A12',
     locationDescription: 'Near the blue rack, bottom shelf (Level 1)',
@@ -73,6 +182,7 @@ export const WAREHOUSE_DISPATCH_ORDERS: DispatchOrder[] = [
     orderId: 'ORD-88204',
     sku: 'SKU-2081',
     itemName: 'Powered 7-Port USB Hub',
+    category: 'USB Hubs',
     requiredQuantity: 10,
     expectedBin: 'B07',
     locationDescription: 'Near yellow staging buffer zone',
@@ -416,62 +526,176 @@ export function matchDispatchOrder(
     };
   }
 
-  // 3. Product Title and Semantic Keywords match
-  const keywordMatches: DispatchOrder[] = [];
-  for (const order of WAREHOUSE_DISPATCH_ORDERS) {
-    const itemNameLower = order.itemName.toLowerCase();
-    const keywords = order.keywords || [];
+  // 3. Product Title and Semantic Keywords match with relevance scoring
+  interface CandidateMatch {
+    order: DispatchOrder;
+    score: number;
+    isSpecific: boolean;
+  }
 
-    // Check full or significant sub-phrase match in item name
-    const hasNameMatch =
-      lower.includes(itemNameLower) ||
-      (itemNameLower.includes('wireless adapter') && (lower.includes('wireless adapter') || lower.includes('adapter') || lower.includes('वायलेस') || lower.includes('ವೈರ್ಲೆಸ್'))) ||
-      (itemNameLower.includes('usb hub') && (lower.includes('usb hub') || lower.includes('usb') || lower.includes('7-port'))) ||
-      (itemNameLower.includes('gaming keyboard') && (lower.includes('gaming keyboard') || lower.includes('keyboard') || lower.includes('कीबोर्ड') || lower.includes('ಕೀಬೋರ್ಡ್'))) ||
-      (itemNameLower.includes('battery pack') && (lower.includes('battery') || lower.includes('scanner battery') || lower.includes('बैटरी') || lower.includes('ಬ್ಯಾಟರಿ'))) ||
-      (itemNameLower.includes('cable harness') && (lower.includes('cable') || lower.includes('harness') || lower.includes('cable harness') || lower.includes('केबल') || lower.includes('ಕೇಬಲ್'))) ||
-      (itemNameLower.includes('touchscreen') && (lower.includes('touchscreen') || lower.includes('hmi') || lower.includes('panel') || lower.includes('स्क्रीन'))) ||
-      (itemNameLower.includes('barcode reader') && (lower.includes('barcode reader') || lower.includes('rugged reader') || (lower.includes('scanner') && !lower.includes('battery')))) ||
-      (itemNameLower.includes('plc') && (lower.includes('plc') || lower.includes('programmable logic') || lower.includes('controller'))) ||
-      (itemNameLower.includes('barcode printer') && (lower.includes('printer') || lower.includes('barcode printer'))) ||
-      (itemNameLower.includes('caster wheel') && (lower.includes('caster') || lower.includes('swivel caster') || lower.includes('wheel'))) ||
-      (itemNameLower.includes('raid controller') && (lower.includes('raid') || lower.includes('nvme') || lower.includes('controller')));
+  // If query explicitly mentions unstocked items (e.g. laptop charger or hydraulic jack)
+  const isUnstockedSpecific = lower.includes('laptop') || lower.includes('hydraulic');
 
-    const hasKeywordMatch = keywords.some((kw) => {
-      const kwRegex = new RegExp(`\\b${kw.toLowerCase()}\\b`, 'i');
-      return kwRegex.test(lower);
-    });
+  const candidates: CandidateMatch[] = [];
 
-    if (hasNameMatch || hasKeywordMatch) {
-      if (!keywordMatches.some((m) => m.sku === order.sku)) {
-        keywordMatches.push(order);
+  if (!isUnstockedSpecific) {
+    for (const order of WAREHOUSE_DISPATCH_ORDERS) {
+      const itemNameLower = order.itemName.toLowerCase();
+      const keywords = order.keywords || [];
+      let score = 0;
+      let isSpecific = false;
+
+      // Full exact item title match
+      if (lower.includes(itemNameLower)) {
+        score += 100;
+        isSpecific = true;
+      }
+
+      // Category / multi-word phrase matching
+      if (itemNameLower.includes('cable harness') && (lower.includes('cable harness') || lower.includes('harness') || lower.includes('shielded cable'))) {
+        score += 70;
+        isSpecific = true;
+      } else if (itemNameLower.includes('charging cable') && !lower.includes('harness')) {
+        if (lower.includes('braided') && order.sku === 'SKU-2201') {
+          score += 85;
+          isSpecific = true;
+        } else if (lower.includes('lightning') && order.sku === 'SKU-2202') {
+          score += 85;
+          isSpecific = true;
+        } else if (!lower.includes('braided') && !lower.includes('lightning') && (lower.includes('charging cable') || lower.includes('usb cable') || lower.includes('cable') || lower.includes('केबल') || lower.includes('ಕೇಬಲ್'))) {
+          score += 50;
+        }
+      } else if (itemNameLower.includes('charger')) {
+        if (lower.includes('fast') && order.sku === 'SKU-2045') {
+          score += 80;
+          isSpecific = true;
+        } else if ((lower.includes('travel') || lower.includes('multi-port')) && order.sku === 'SKU-2046') {
+          score += 80;
+          isSpecific = true;
+        } else if (lower.includes('charger') || lower.includes('चार्जर') || lower.includes('ಚಾರ್ಜರ್')) {
+          score += 50;
+        }
+      } else if (itemNameLower.includes('phone cover')) {
+        if ((lower.includes('silicone') || lower.includes('shockproof') || lower.includes('clear')) && order.sku === 'SKU-2101') {
+          score += 80;
+          isSpecific = true;
+        } else if ((lower.includes('armor') || lower.includes('heavy-duty') || lower.includes('black')) && order.sku === 'SKU-2102') {
+          score += 80;
+          isSpecific = true;
+        } else if (lower.includes('phone cover') || lower.includes('cover') || lower.includes('case') || lower.includes('कवर') || lower.includes('ಕವರ್')) {
+          score += 50;
+        }
+      } else if (itemNameLower.includes('earphone') || itemNameLower.includes('earbud')) {
+        if ((lower.includes('wireless') || lower.includes('bluetooth') || lower.includes('noise')) && order.sku === 'SKU-2301') {
+          score += 80;
+          isSpecific = true;
+        } else if ((lower.includes('wired') || lower.includes('in-ear')) && order.sku === 'SKU-2302') {
+          score += 80;
+          isSpecific = true;
+        } else if (lower.includes('earphone') || lower.includes('earbud') || lower.includes('इयरफ़ोन') || lower.includes('ಇಯರ್‌ಫೋನ್')) {
+          score += 50;
+        }
+      } else if (itemNameLower.includes('wireless adapter') && (lower.includes('wireless adapter') || lower.includes('adapter') || lower.includes('wifi') || lower.includes('वायलेस') || lower.includes('ವೈರ್ಲೆಸ್'))) {
+        score += 65;
+        isSpecific = true;
+      } else if (itemNameLower.includes('usb hub') && (lower.includes('usb hub') || lower.includes('7-port') || lower.includes('powered hub') || lower.includes('हब'))) {
+        score += 65;
+        isSpecific = true;
+      } else if (itemNameLower.includes('gaming keyboard') && (lower.includes('gaming keyboard') || lower.includes('keyboard') || lower.includes('mechanical') || lower.includes('कीबोर्ड') || lower.includes('ಕೀಬೋರ್ಡ್'))) {
+        score += 65;
+        isSpecific = true;
+      } else if (itemNameLower.includes('battery pack') && (lower.includes('battery pack') || lower.includes('scanner battery') || lower.includes('li-ion') || lower.includes('battery') || lower.includes('बैटरी') || lower.includes('ಬ್ಯಾಟರಿ'))) {
+        score += 65;
+        isSpecific = true;
+      } else if (itemNameLower.includes('caster wheel') && (lower.includes('caster') || lower.includes('swivel caster') || lower.includes('wheel') || lower.includes('पहिया') || lower.includes('ಚಕ್ರ'))) {
+        score += 65;
+        isSpecific = true;
+      } else if (itemNameLower.includes('touchscreen') && (lower.includes('touchscreen') || lower.includes('hmi') || lower.includes('panel') || lower.includes('स्क्रीन') || lower.includes('ಪ್ಯಾನೆಲ್'))) {
+        score += 65;
+        isSpecific = true;
+      } else if (itemNameLower.includes('barcode reader') && (lower.includes('barcode reader') || lower.includes('rugged reader') || lower.includes('scanner gun') || lower.includes('बारकोड स्कैनर'))) {
+        score += 65;
+        isSpecific = true;
+      } else if (itemNameLower.includes('barcode printer') && (lower.includes('barcode printer') || lower.includes('thermal printer') || lower.includes('printer') || lower.includes('प्रिंटर') || lower.includes('ಪ್ರಿಂಟರ್'))) {
+        score += 65;
+        isSpecific = true;
+      } else if (itemNameLower.includes('raid controller') && (/\braid\b/i.test(lower) || /\bnvme\b/i.test(lower) || (/\bcontroller\b/i.test(lower) && !/\bplc\b/i.test(lower)))) {
+        score += 50;
+        if (/\braid\b/i.test(lower) || /\bnvme\b/i.test(lower)) {
+          score += 30;
+          isSpecific = true;
+        }
+      } else if (itemNameLower.includes('plc') && (/\bplc\b/i.test(lower) || lower.includes('programmable logic') || (/\bcontroller\b/i.test(lower) && !/\braid\b/i.test(lower)))) {
+        score += 50;
+        if (/\bplc\b/i.test(lower) || lower.includes('programmable logic')) {
+          score += 30;
+          isSpecific = true;
+        }
+      }
+
+      // Keyword array matches
+      for (const kw of keywords) {
+        const kwLower = kw.toLowerCase();
+        // Skip generic 'cable' keyword if user specifically asked for 'harness'
+        if (kwLower === 'cable' && lower.includes('harness')) continue;
+        // Skip generic 'cable' keyword if user asked for 'charger'
+        if (kwLower === 'cable' && lower.includes('charger')) continue;
+        // Skip generic 'cable' keyword if user asked for specific cable model
+        if (kwLower === 'cable' && lower.includes('braided') && order.sku !== 'SKU-2201') continue;
+        if (kwLower === 'cable' && lower.includes('lightning') && order.sku !== 'SKU-2202') continue;
+
+        const kwRegex = new RegExp(`\\b${kwLower}\\b`, 'i');
+        if (kwRegex.test(lower)) {
+          score += kwLower.includes(' ') ? 40 : 25;
+        }
+      }
+
+      // Active scenario alignment bonus
+      if (activeScenarioId && order.scenarioId === activeScenarioId) {
+        score += 15;
+      }
+
+      if (score >= 40) {
+        if (!candidates.some((c) => c.order.sku === order.sku)) {
+          candidates.push({ order, score, isSpecific });
+        }
       }
     }
   }
 
-  if (keywordMatches.length === 1) {
-    const order = keywordMatches[0];
-    const qtyInfo = extractReportedQuantity(message, order.requiredQuantity);
-    return {
-      status: 'MATCHED',
-      order,
-      matches: [order],
-      confidence: 'HIGH',
-      matchedReason: `Matched catalog item: ${order.itemName}`,
-      reportedQuantity: qtyInfo.reportedQty,
-      quantityDiscrepancy: qtyInfo.discrepancy,
-      isDamagedReported: isDamaged,
-    };
-  } else if (keywordMatches.length > 1) {
-    // If multiple products match (e.g., 'controller' matches RAID & PLC, 'scanner' matches reader & battery)
-    return {
-      status: 'MULTIPLE_MATCHES',
-      order: keywordMatches[0],
-      matches: keywordMatches,
-      confidence: 'AMBIGUOUS',
-      matchedReason: `Found multiple matching items: ${keywordMatches.map((k) => k.itemName).join(', ')}`,
-      isDamagedReported: isDamaged,
-    };
+  // Sort descending by score
+  candidates.sort((a, b) => b.score - a.score);
+
+  if (candidates.length > 0) {
+    const highestScore = candidates[0].score;
+    // Keep only candidates within 15 points of top score to eliminate low-relevance false positives
+    const topCandidates = candidates.filter((c) => c.score >= highestScore - 15);
+
+    if (topCandidates.length === 1 || (topCandidates[0].score >= (topCandidates[1]?.score ?? 0) + 20)) {
+      const winner = topCandidates[0].order;
+      const qtyInfo = extractReportedQuantity(message, winner.requiredQuantity);
+      return {
+        status: 'MATCHED',
+        order: winner,
+        matches: [winner],
+        confidence: 'HIGH',
+        matchedReason: `Matched catalog item: ${winner.itemName}`,
+        reportedQuantity: qtyInfo.reportedQty,
+        quantityDiscrepancy: qtyInfo.discrepancy,
+        isDamagedReported: isDamaged,
+      };
+    } else {
+      // Multiple items tie or have comparable high scores
+      const matchedOrders = topCandidates.map((c) => c.order);
+      return {
+        status: 'MULTIPLE_MATCHES',
+        order: matchedOrders[0],
+        matches: matchedOrders,
+        confidence: 'AMBIGUOUS',
+        matchedReason: `Found multiple matching items: ${matchedOrders.map((k) => k.itemName).join(', ')}`,
+        isDamagedReported: isDamaged,
+      };
+    }
   }
 
   // 4. Check if the message matches the active scenario's default prompt exactly
