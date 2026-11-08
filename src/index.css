@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-html, body, #root {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
+/* Same system font stack and Tailwind v4 defaults as StockTrace v1 */
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }

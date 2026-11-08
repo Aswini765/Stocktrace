@@ -6,4 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
-firebase-applet-config.json
+_claude_backup/
+scratch/
+api_config_output.txt
+curl_output.txt
+dist-single/
