@@ -10,7 +10,8 @@ const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 export const WORKSPACE = (import.meta.env.VITE_STOCKTRACE_WORKSPACE as string | undefined) || 'demo';
 const TABLE = 'stocktrace_events';
-const LOCAL_KEY = `stocktrace-events-${WORKSPACE}`;
+// v5: the event log starts with a RESET that anchors the demo's clock (older logs are ignored)
+const LOCAL_KEY = `stocktrace-v5-events-${WORKSPACE}`;
 const OUTBOX_KEY = `stocktrace-outbox-${WORKSPACE}`;
 
 export const sharedMode = Boolean(URL && KEY);
@@ -24,6 +25,7 @@ const write = (k: string, v: any) => { try { localStorage.setItem(k, JSON.string
 
 // ----- this-device-only mode -----
 export function localEvents(): Ev[] { return read(LOCAL_KEY); }
+export function localClear() { write(LOCAL_KEY, []); }
 export function localAppend(action: any): Ev {
   const evs = localEvents();
   const ev = { id: (evs.at(-1)?.id || 0) + 1, action };

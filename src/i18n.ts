@@ -21,7 +21,6 @@ const T = {
   ordered: { en: 'Ordered', hi: 'ऑर्डर', kn: 'ಆರ್ಡರ್' },
   howMany: { en: 'How many did you find?', hi: 'आपको कितने मिले?', kn: 'ನಿಮಗೆ ಎಷ್ಟು ಸಿಕ್ಕಿತು?' },
   what: { en: 'What happened?', hi: 'क्या हुआ?', kn: 'ಏನಾಯಿತು?' },
-  not_found: { en: 'Not found', hi: 'नहीं मिला', kn: 'ಸಿಗಲಿಲ್ಲ' },
   fewer: { en: 'Fewer found', hi: 'कम मिले', kn: 'ಕಡಿಮೆ ಸಿಕ್ಕಿತು' },
   damaged: { en: 'Damaged', hi: 'खराब है', kn: 'ಹಾಳಾಗಿದೆ' },
   wrong_item: { en: 'Wrong item', hi: 'गलत सामान', kn: 'ತಪ್ಪು ವಸ್ತು' },
@@ -95,7 +94,68 @@ const T = {
   pickedDone: { en: 'Sent to packing.', hi: 'पैकिंग पर भेज दिया।', kn: 'ಪ್ಯಾಕಿಂಗ್‌ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ.' },
   waitOwner: { en: 'Wait: owner is deciding the short items', hi: 'रुकें: मालिक कम सामान पर फैसला कर रहे हैं', kn: 'ನಿಲ್ಲಿ: ಕಡಿಮೆ ವಸ್ತುಗಳ ಬಗ್ಗೆ ಮಾಲೀಕರು ನಿರ್ಧರಿಸುತ್ತಿದ್ದಾರೆ' },
   canDispatch: { en: 'Ready to pack and dispatch', hi: 'पैक और डिस्पैच के लिए तैयार', kn: 'ಪ್ಯಾಕ್ ಮತ್ತು ರವಾನೆಗೆ ಸಿದ್ಧ' },
+  not_found: { en: 'Not on the shelf', hi: 'शेल्फ पर नहीं', kn: 'ಶೆಲ್ಫ್‌ನಲ್ಲಿ ಇಲ್ಲ' },
+  today: { en: 'today', hi: 'आज', kn: 'ಇಂದು' },
+  tomorrow: { en: 'tomorrow', hi: 'कल', kn: 'ನಾಳೆ' },
+  lines: { en: 'lines', hi: 'लाइन', kn: 'ಸಾಲುಗಳು' },
+  found: { en: 'Found', hi: 'मिला', kn: 'ಸಿಕ್ಕಿತು' },
+  undo: { en: 'Undo', hi: 'वापस लें', kn: 'ರದ್ದುಮಾಡಿ' },
+  confirmPicked: {
+    en: 'Lines not marked short go to packing in full and come off the shelf stock.',
+    hi: 'जो लाइन "कम है" नहीं हैं, वे पूरी पैकिंग पर जाएँगी और शेल्फ के स्टॉक से घटेंगी।',
+    kn: '"ಕಡಿಮೆ ಇದೆ" ಎಂದು ಗುರುತಿಸದ ಸಾಲುಗಳು ಪೂರ್ಣವಾಗಿ ಪ್ಯಾಕಿಂಗ್‌ಗೆ ಹೋಗುತ್ತವೆ ಮತ್ತು ಶೆಲ್ಫ್ ಸ್ಟಾಕ್‌ನಿಂದ ಕಡಿಮೆಯಾಗುತ್ತವೆ.',
+  },
+  full: { en: 'full', hi: 'पूरी', kn: 'ಪೂರ್ಣ' },
+  yesPicked: { en: 'Yes, order picked', hi: 'हाँ, ऑर्डर पिक हो गया', kn: 'ಹೌದು, ಆರ್ಡರ್ ಪಿಕ್ ಆಯಿತು' },
+  goBack: { en: 'Go back', hi: 'वापस जाएँ', kn: 'ಹಿಂದೆ ಹೋಗಿ' },
+  hintPurchase: { en: '{qty} came in at {time}, may not be on a shelf yet', hi: '{qty} {time} बजे आए, शायद अभी शेल्फ पर नहीं रखे', kn: '{qty} {time}ಕ್ಕೆ ಬಂದಿವೆ, ಇನ್ನೂ ಶೆಲ್ಫ್‌ಗೆ ಇಟ್ಟಿಲ್ಲದಿರಬಹುದು' },
+  hintStock: { en: 'Records say {qty} should be here', hi: 'रिकॉर्ड के हिसाब से यहाँ {qty} होने चाहिए', kn: 'ದಾಖಲೆಯ ಪ್ರಕಾರ ಇಲ್ಲಿ {qty} ಇರಬೇಕು' },
+  hintMovement: { en: '{qty} moved here on {date}', hi: '{date} को {qty} यहाँ रखे गए', kn: '{date} ರಂದು {qty} ಇಲ್ಲಿಗೆ ಸ್ಥಳಾಂತರಿಸಲಾಗಿದೆ' },
+  returnsWarn: { en: 'Returned goods: check the condition before picking', hi: 'लौटा हुआ माल: पिक करने से पहले हालत जाँचें', kn: 'ಹಿಂತಿರುಗಿದ ಸರಕು: ಪಿಕ್ ಮಾಡುವ ಮೊದಲು ಸ್ಥಿತಿ ಪರಿಶೀಲಿಸಿ' },
+  showRecord: { en: 'Tally record', hi: 'टैली रिकॉर्ड', kn: 'ಟ್ಯಾಲಿ ದಾಖಲೆ' },
+  addToOrder: { en: 'Add to this order', hi: 'इस ऑर्डर में जोड़ें', kn: 'ಈ ಆರ್ಡರ್‌ಗೆ ಸೇರಿಸಿ' },
+  substituteFor: { en: 'in place of', hi: 'के बदले', kn: 'ಬದಲಿಗೆ' },
+  arrived: { en: 'bought in, in the receiving area', hi: 'बाहर से मँगाया, रिसीविंग एरिया में', kn: 'ಹೊರಗಿನಿಂದ ತರಿಸಲಾಗಿದೆ, ಸ್ವೀಕರಿಸುವ ಸ್ಥಳದಲ್ಲಿ' },
+  pickedBtn: { en: 'Picked', hi: 'पिक किया', kn: 'ಪಿಕ್ ಮಾಡಿದೆ' },
+  packList: { en: 'Pack list', hi: 'पैकिंग सूची', kn: 'ಪ್ಯಾಕಿಂಗ್ ಪಟ್ಟಿ' },
+  blockDecision: { en: 'Wait: the owner is deciding the short items. Do not load.', hi: 'रुकें: मालिक कम सामान पर फैसला कर रहे हैं। लोड न करें।', kn: 'ನಿಲ್ಲಿ: ಮಾಲೀಕರು ಕಡಿಮೆ ವಸ್ತುಗಳ ಬಗ್ಗೆ ನಿರ್ಧರಿಸುತ್ತಿದ್ದಾರೆ. ಲೋಡ್ ಮಾಡಬೇಡಿ.' },
+  blockStock: { en: 'Wait: stock is being arranged from outside. Do not load.', hi: 'रुकें: माल बाहर से मँगाया जा रहा है। लोड न करें।', kn: 'ನಿಲ್ಲಿ: ಸ್ಟಾಕ್ ಹೊರಗಿನಿಂದ ತರಿಸಲಾಗುತ್ತಿದೆ. ಲೋಡ್ ಮಾಡಬೇಡಿ.' },
+  blockExtra: { en: 'Pick the items below and add them to this order.', hi: 'नीचे दिया सामान पिक करके इस ऑर्डर में जोड़ें।', kn: 'ಕೆಳಗಿನ ವಸ್ತುಗಳನ್ನು ಪಿಕ್ ಮಾಡಿ ಈ ಆರ್ಡರ್‌ಗೆ ಸೇರಿಸಿ.' },
+  blockInvoice: { en: 'Wait: the new invoice is not approved yet. Do not load.', hi: 'रुकें: नया बिल अभी मंज़ूर नहीं हुआ। लोड न करें।', kn: 'ನಿಲ್ಲಿ: ಹೊಸ ಬಿಲ್ ಇನ್ನೂ ಅನುಮೋದನೆ ಆಗಿಲ್ಲ. ಲೋಡ್ ಮಾಡಬೇಡಿ.' },
+  readyLoad: { en: 'Ready. Pack exactly the list below, then load.', hi: 'तैयार। नीचे की सूची जितना ही पैक करें, फिर लोड करें।', kn: 'ಸಿದ್ಧ. ಕೆಳಗಿನ ಪಟ್ಟಿಯಷ್ಟೇ ಪ್ಯಾಕ್ ಮಾಡಿ, ನಂತರ ಲೋಡ್ ಮಾಡಿ.' },
+  markDispatched: { en: 'Truck loaded: mark dispatched', hi: 'गाड़ी लोड हो गई: डिस्पैच करें', kn: 'ವಾಹನ ಲೋಡ್ ಆಯಿತು: ರವಾನೆ ಗುರುತಿಸಿ' },
+  dispatched: { en: 'Dispatched', hi: 'डिस्पैच हो गया', kn: 'ರವಾನೆಯಾಗಿದೆ' },
+  countGood: {
+    en: 'Count only good units on this shelf. Damaged units kept aside are not counted.',
+    hi: 'इस शेल्फ पर केवल अच्छे यूनिट गिनें। अलग रखे खराब यूनिट न गिनें।',
+    kn: 'ಈ ಶೆಲ್ಫ್‌ನಲ್ಲಿ ಉತ್ತಮ ಘಟಕಗಳನ್ನು ಮಾತ್ರ ಎಣಿಸಿ. ಪಕ್ಕಕ್ಕೆ ಇಟ್ಟ ಹಾಳಾದ ಘಟಕಗಳನ್ನು ಎಣಿಸಬೇಡಿ.',
+  },
+  whereFound: { en: 'Where are they?', hi: 'वे कहाँ हैं?', kn: 'ಅವು ಎಲ್ಲಿವೆ?' },
+  howManyThere: { en: 'How many there?', hi: 'वहाँ कितने?', kn: 'ಅಲ್ಲಿ ಎಷ್ಟು?' },
+  save: { en: 'Save', hi: 'सेव करें', kn: 'ಉಳಿಸಿ' },
+  missingN: { en: '{n} missing', hi: '{n} कम', kn: '{n} ಕಡಿಮೆ' },
+  extraN: { en: '{n} more than expected', hi: '{n} ज़्यादा', kn: '{n} ಹೆಚ್ಚು' },
+  wasShort: { en: 'Short', hi: 'कम', kn: 'ಕಡಿಮೆ' },
+  pickedOf: { en: 'picked', hi: 'पिक', kn: 'ಪಿಕ್' },
+  decided: { en: 'owner decided', hi: 'मालिक ने तय किया', kn: 'ಮಾಲೀಕರು ನಿರ್ಧರಿಸಿದ್ದಾರೆ' },
+  searchStill: { en: 'Still short', hi: 'अभी भी कम', kn: 'ಇನ್ನೂ ಕಡಿಮೆ' },
+  cause_wrong_shelf: { en: 'Found on another shelf', hi: 'दूसरे शेल्फ पर मिला', kn: 'ಬೇರೆ ಶೆಲ್ಫ್‌ನಲ್ಲಿ ಸಿಕ್ಕಿತು' },
+  cause_return_not_entered: { en: 'Customer return not entered', hi: 'ग्राहक की वापसी दर्ज नहीं हुई', kn: 'ಗ್ರಾಹಕ ಹಿಂತಿರುಗಿಸಿದ್ದು ದಾಖಲಾಗಿಲ್ಲ' },
+  cause_sample_not_entered: { en: 'Sample / display not entered', hi: 'सैंपल / डिस्प्ले दर्ज नहीं हुआ', kn: 'ಮಾದರಿ / ಪ್ರದರ್ಶನ ದಾಖಲಾಗಿಲ್ಲ' },
+  cause_damaged: { en: 'Damaged, not written off', hi: 'खराब, खाते से नहीं हटाया', kn: 'ಹಾಳಾಗಿದೆ, ಖಾತೆಯಿಂದ ತೆಗೆದಿಲ್ಲ' },
+  cause_entry_error: { en: 'Tally entry error', hi: 'टैली एंट्री में गलती', kn: 'ಟ್ಯಾಲಿ ನಮೂದು ತಪ್ಪು' },
+  cause_missed_on_shelf: { en: 'Was on the shelf (missed while picking)', hi: 'शेल्फ पर था (पिक करते समय छूट गया)', kn: 'ಶೆಲ್ಫ್‌ನಲ್ಲಿತ್ತು (ಪಿಕ್ ಮಾಡುವಾಗ ತಪ್ಪಿತು)' },
+  cause_unexplained: { en: 'Unexplained', hi: 'कारण पता नहीं', kn: 'ಕಾರಣ ತಿಳಿದಿಲ್ಲ' },
 };
+
+// Units in the picker's language (numbers stay as digits)
+const UNITS = {
+  pc: { en: ['pc', 'pcs'], hi: ['पीस', 'पीस'], kn: ['ಪೀಸ್', 'ಪೀಸ್'] },
+  box: { en: ['box', 'boxes'], hi: ['डिब्बा', 'डिब्बे'], kn: ['ಡಬ್ಬಿ', 'ಡಬ್ಬಿಗಳು'] },
+  coil: { en: ['coil', 'coils'], hi: ['कॉइल', 'कॉइल'], kn: ['ಕಾಯಿಲ್', 'ಕಾಯಿಲ್‌ಗಳು'] },
+};
+export const unitWord = (unit, q, lang) => { const u = UNITS[unit]?.[lang] || UNITS[unit]?.en; return u ? u[q === 1 ? 0 : 1] : unit; };
+export const fill = (str, vars) => str.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
 
 export const t = (key, lang) => T[key]?.[lang] || T[key]?.en || key;
 
@@ -106,7 +166,6 @@ export function parseVoice(text) {
   let reason = null;
   if (/damag|broken|खराब|टूट|ಹಾಳ|kharab|haala/.test(s)) reason = 'damaged';
   else if (/wrong|गलत|ತಪ್ಪು|galat|tappu/.test(s)) reason = 'wrong_item';
-  else if (/fewer|less|कम|ಕಡಿಮೆ|kam|kadime/.test(s)) reason = 'fewer';
-  else if (/not found|missing|नहीं मिला|ಸಿಗಲಿಲ್ಲ|nahi mila|sigalilla/.test(s)) reason = 'not_found';
+  else if (/fewer|less|not found|missing|कम|नहीं मिला|ಕಡಿಮೆ|ಸಿಗಲಿಲ್ಲ|kam|kadime|nahi mila|sigalilla/.test(s)) reason = 'not_found';
   return { qty: num ? Number(num[0]) : null, reason };
 }

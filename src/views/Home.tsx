@@ -1,7 +1,7 @@
 import type { Go } from './ui.tsx';
 import React from 'react';
 import { Smartphone, Scale, FileCheck2, ArrowRight } from 'lucide-react';
-import { useStore, orderStatus } from '../store.tsx';
+import { useStore, orderStatus, needsOwnerSignOff, dispatchBlock } from '../store.tsx';
 import { COMPANY } from '../data/seed.ts';
 
 function RoleCard({ id, tag, tagCls, hover, icon: Icon, title, body, chips, cta, onClick }) {
@@ -41,7 +41,8 @@ export default function Home({ go }: { go: Go }) {
   const { state } = useStore();
   const statuses = state.orders.filter((o: any) => state.cases.some((c: any) => c.orderId === o.id)).map((o: any) => orderStatus(state, o));
   const open = statuses.filter((s: string) => s !== 'CLOSED').length;
-  const owner = statuses.filter((s: string) => s === 'AWAITING_OWNER' || s === 'MESSAGE_PENDING').length;
+  const owner = statuses.filter((s: string) => ['AWAITING_OWNER', 'MESSAGE_PENDING', 'AWAITING_STOCK'].includes(s)).length + state.drafts.filter((d: any) => d.status === 'pending' && needsOwnerSignOff(d)).length;
+  const held = state.orders.filter((o: any) => { const b = dispatchBlock(state, o); return b && b !== 'dispatched' && b !== 'picking'; }).length;
   const drafts = state.drafts.filter((d) => d.status === 'pending').length;
   const recounts = state.recounts.filter((r: any) => r.status !== 'done').length;
 
@@ -79,8 +80,8 @@ export default function Home({ go }: { go: Go }) {
           <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">LIVE · DEMO DATA</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label="Open short cases" value={open} note={`${state.cases.length} reported in total`} />
-          <Stat label="Waiting for owner" value={owner} note="Decide or message customer" tone={owner ? 'text-amber-700' : 'text-slate-950'} />
+          <Stat label="Orders with a short" value={open} note={`still open • ${held} held at packing`} />
+          <Stat label="Waiting for owner" value={owner} note="Decide, message or sign off a loss" tone={owner ? 'text-amber-700' : 'text-slate-950'} />
           <Stat label="Drafts to approve" value={drafts} note="Accountant review before Tally" tone={drafts ? 'text-violet-700' : 'text-slate-950'} />
           <Stat label="Recounts open" value={recounts} note="Shelves to count" />
         </div>

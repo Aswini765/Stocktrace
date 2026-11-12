@@ -7,6 +7,9 @@ const amt = (n) => Number(n).toFixed(2);
 
 // Draft Tally XML for a posted voucher. Ledger names (Sales, Output CGST, ...) must match the
 // company's own ledgers: import into a test company first. This is a starting point, not a certified integration.
+// Purchase entries are typed in from the supplier's bill (rates, tax and bill number come from it), so no XML.
+export const exportable = (d) => d.type !== 'purchase';
+
 export function voucherXml(d) {
   const date = tallyDate(d.approvedAt || d.createdAt);
   // No VOUCHERNUMBER: Tally assigns numbers in its own series.
@@ -25,7 +28,13 @@ export function voucherXml(d) {
           <RATE>${amt(r.rate)}/${esc(it.unit)}</RATE>
           <AMOUNT>${isCN ? '-' : ''}${amt(r.value)}</AMOUNT>
           <ACTUALQTY> ${r.qty} ${esc(it.unit)}</ACTUALQTY>
-          <BILLEDQTY> ${r.qty} ${esc(it.unit)}</BILLEDQTY>
+          <BILLEDQTY> ${r.qty} ${esc(it.unit)}</BILLEDQTY>${d.godowns?.[r.item] ? `
+          <BATCHALLOCATIONS.LIST>
+            <GODOWNNAME>${esc(d.godowns[r.item])}</GODOWNNAME>
+            <AMOUNT>${isCN ? '-' : ''}${amt(r.value)}</AMOUNT>
+            <ACTUALQTY> ${r.qty} ${esc(it.unit)}</ACTUALQTY>
+            <BILLEDQTY> ${r.qty} ${esc(it.unit)}</BILLEDQTY>
+          </BATCHALLOCATIONS.LIST>` : ''}
           <ACCOUNTINGALLOCATIONS.LIST>
             <LEDGERNAME>Sales</LEDGERNAME>
             <ISDEEMEDPOSITIVE>${isCN ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
@@ -74,7 +83,7 @@ export function voucherXml(d) {
           <STOCKITEMNAME>${esc(it.name)}</STOCKITEMNAME>
           <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
           <ACTUALQTY> ${d.qty} ${esc(it.unit)}</ACTUALQTY>
-          <BATCHALLOCATIONS.LIST><GODOWNNAME>${esc(d.to)}</GODOWNNAME><ACTUALQTY> ${d.qty} ${esc(it.unit)}</ACTUALQTY></BATCHALLOCATIONS.LIST>
+          <BATCHALLOCATIONS.LIST><GODOWNNAME>${esc(d.to.split(' / ')[0])}</GODOWNNAME><ACTUALQTY> ${d.qty} ${esc(it.unit)}</ACTUALQTY></BATCHALLOCATIONS.LIST>
         </INVENTORYENTRIESIN.LIST>
       </VOUCHER>`;
   } else if (d.type === 'physical_stock') {

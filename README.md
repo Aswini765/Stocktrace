@@ -1,4 +1,4 @@
-# StockTrace v2.1 — Short-Supply Resolution for SME distributors on Tally
+# StockTrace v2.2 — Short-Supply Resolution for SME distributors on Tally
 
 StockTrace helps a small distributor resolve an order that cannot ship in full, end to end: the picker reports the short, a quick search checks only places that have a Tally record behind them, the owner decides what happens to the order, StockTrace drafts the credit note / invoice / stock entries for the accountant to approve, the customer gets a message, and a recount stops the same gap recurring.
 
@@ -7,6 +7,16 @@ v2 follows the requirements doc "StockTrace — Requirements & End-to-End Flow (
 **Trust principle:** StockTrace drafts. People decide and approve. Nothing reaches Tally until the accountant approves it, and no location is ever suggested without a record.
 
 ---
+
+## What changed in v2.2 (after a full role-by-role test)
+
+- **Goods match the paperwork:** a substitute or bought-in stock becomes a pick task on the picker's phone, and there's a pack list. The truck is held until any new invoice is approved, and the packer marks the order dispatched. After dispatch, every correction is a credit note.
+- **Stock losses are controlled:** losses above the owner's limit (default ₹2,000) need the owner's sign-off. "Found on another shelf" becomes a transfer, not a write-off. Damaged units set aside are excluded from the recount. Stock journals must be imported before the count for the same shelf. A place that should have had stock but didn't gets its own recount.
+- **Picker:** quantities default from the record, and the picker can undo a short report. Picking needs a confirm. Units are shown. Hints are in Hindi and Kannada too. Returned goods come last, with a condition warning. Orders are sorted by truck time. Reset has moved to Settings, behind a confirmation.
+- **Owner:** each option shows its own bill impact. A part substitute must say what happens to the rest, and the substitute's price goes into the customer message. Arranged stock records the buying price and margin and drafts a purchase entry. Shipped orders only offer options that still apply.
+- **Accountant:** the IRN deadline is shown with its date and time left, and trucks waiting for an invoice come first. Purchase entries are marked as entered. The Tally XML carries godowns and downloads in import order.
+- **Reports:** sales lost vs recovered, and write-offs including those waiting for approval. Settings changes are logged.
+- **Demo data** is timed relative to the reset, so deadlines are always realistic.
 
 ## Capabilities & Implementation Status
 
@@ -93,5 +103,5 @@ src/lib/tax.ts            GST split, s.34(2) deadline
 src/lib/tally.ts          Tally XML for approved drafts (no voucher numbers)
 src/i18n.ts               Picker strings in English, Hindi, Kannada; voice parser
 src/views/                Home, Picker, Owner, Accountant, Reports, SOP and Settings modals
-tests/flow.test.ts        17 end-to-end flow tests
+tests/flow.test.ts        24 end-to-end flow tests
 ```

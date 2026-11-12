@@ -1,6 +1,6 @@
 import React from 'react';
 import { Download } from 'lucide-react';
-import { useStore, orderStatus, shortQty, totalFound, item, party, REASONS, OUTCOMES, caseRecount, STATUS_META, ROOT_CAUSES } from '../store.tsx';
+import { useStore, orderStatus, shortQty, totalFound, item, party, REASONS, OUTCOMES, caseRecounts, STATUS_META, ROOT_CAUSES, diffValue, DRAFT_LABEL } from '../store.tsx';
 import { PageHeader , type Go } from './ui.tsx';
 import { inr, date, median } from '../lib/format.ts';
 import { taxLines } from '../lib/tax.ts';
@@ -15,8 +15,24 @@ export function computeReport(state) {
   const posted = state.drafts.filter((d) => d.status === 'approved');
   const cns = posted.filter((d) => d.type === 'credit_note');
   const cnValue = cns.reduce((s, d) => s + taxLines(d.lines, party(d.party)).total, 0);
-  const writeOffs = posted.filter((d) => d.type === 'stock_journal' || (d.type === 'physical_stock' && d.counted < d.book));
-  const writeOffValue = writeOffs.reduce((s, d) => s + (d.type === 'stock_journal' ? d.qty : d.book - d.counted) * item(d.item).rate, 0);
+  // stock lost: damaged write-offs and count differences (gains reduce it)
+  const lossOf = (d) => (d.type === 'stock_journal' && d.kind !== 'transfer' ? d.qty * item(d.item).rate : d.type === 'physical_stock' ? -diffValue(d) : 0);
+  const writeOffValue = posted.reduce((s, d) => s + lossOf(d), 0);
+  const writeOffPending = state.drafts.filter((d) => d.status === 'pending').reduce((s, d) => s + lossOf(d), 0);
+  // short value split: lost for good vs recovered another way
+  let lost = 0, recovered = 0;
+  for (const c of cases) {
+    const v = shortQty(c) * item(c.item).rate;
+    const o = c.outcome;
+    if (!o) continue;
+    if (o.type === 'partial' || o.type === 'cancel_line') lost += v;
+    else if (o.type === 'substitute') {
+      const rest = shortQty(c) - o.substitute.qty;
+      recovered += o.substitute.qty * item(o.substitute.item).rate;
+      if (rest > 0 && o.substitute.rest !== 'backorder') lost += rest * item(c.item).rate;
+      else recovered += rest * item(c.item).rate;
+    } else recovered += v; // backorder, source, no_change
+  }
   const decideMins = cases.filter((c) => c.outcome?.at && c.outcome.type !== 'found').map((c) => (c.outcome.at - c.reportedAt) / 60000);
   const foundInSearch = cases.filter((c) => c.outcome?.type === 'found').length;
   const reissues = posted.filter((d) => d.type === 'reissue').length;
@@ -31,7 +47,7 @@ export function computeReport(state) {
   });
   return {
     lines, cases: cases.length, per1000: lines ? (cases.length / lines) * 1000 : 0, shortValue,
-    cnCount: cns.length, cnValue, writeOffValue, medianDecide: median(decideMins), foundInSearch,
+    cnCount: cns.length, cnValue, writeOffValue, writeOffPending, lost, recovered, medianDecide: median(decideMins), foundInSearch,
     pending: state.drafts.filter((d) => d.status === 'pending').length,
     reissues, backorders, causes: Object.entries(causes).sort((a, b) => b[1] - a[1]),
     topItems: Object.entries(byItem).sort((a, b) => b[1] - a[1]).slice(0, 5),
@@ -42,14 +58,15 @@ export function computeReport(state) {
 function logRows(state) {
   return state.cases.map((c) => {
     const o = state.orders.find((x) => x.id === c.orderId);
-    const rc = caseRecount(state, c);
-    const approvers = [...new Set(state.drafts.filter((d) => (d.orderId === c.orderId || d.caseId === c.id) && d.status === 'approved').map((d) => d.approvedBy))];
+    const rcs = caseRecounts(state, c);
+    const ds = state.drafts.filter((d) => (d.caseIds || [d.caseId]).includes(c.id) && d.status !== 'rejected');
+    const ok = ds.filter((d) => d.status === 'approved').length;
     return {
       case: c.id, date: date(c.reportedAt), order: o.id, customer: party(o.party).name, item: item(c.item).code,
       location: `${c.godown} / ${c.shelf}`, reason: REASONS[c.reason], ordered: c.ordered, found: totalFound(c), short: shortQty(c),
       value: shortQty(c) * item(c.item).rate, outcome: c.outcome ? OUTCOMES[c.outcome.type] : '—',
-      recount: rc ? (rc.status === 'open' ? 'Open' : `Counted ${rc.counted} vs book ${rc.book}`) : 'n/a (damaged)',
-      approver: approvers.join(', ') || '—', status: STATUS_META[orderStatus(state, o)].label,
+      recount: rcs.length ? rcs.map((r) => `${r.shelf}: ${r.status === 'done' ? `${r.counted} vs ${r.book}${r.cause ? ` (${ROOT_CAUSES[r.cause]})` : ''}` : r.status === 'open' ? 'open' : 'cause pending'}`).join('; ') : 'n/a (damaged)',
+      approver: ds.length ? `${ok} of ${ds.length} approved${ds.length - ok ? ` (${ds.filter((d) => d.status === 'pending').map((d) => DRAFT_LABEL[d.type]).join(', ')} pending)` : ''}` : '—', status: STATUS_META[orderStatus(state, o)].label,
     };
   });
 }
@@ -83,9 +100,9 @@ export default function Reports(_props: { go?: Go }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Kpi label="Shorts per 1,000 order lines" value={r.per1000.toFixed(0)} note={`${r.cases} shorts across ${r.lines} order lines`} />
-        <Kpi label="Value of short lines" value={inr(r.shortValue, 0)} note={`Excl. GST • ${r.foundInSearch} resolved by quick search`} />
+        <Kpi label="Sales lost to shorts" value={inr(r.lost, 0)} note={`Excl. GST • ${inr(r.recovered, 0)} recovered by substitutes, backorders, bought-in stock • ${r.foundInSearch} found by quick search`} />
         <Kpi label="Credit notes approved" value={inr(r.cnValue, 0)} note={`${r.cnCount} credit note(s) incl. GST • ${r.reissues} invoice(s) re-issued instead • ${r.pending} pending`} />
-        <Kpi label="Stock written off" value={inr(r.writeOffValue, 0)} note={`Median report → decision: ${r.medianDecide == null ? '—' : `${Math.round(r.medianDecide)} min`}`} />
+        <Kpi label="Stock written off" value={inr(r.writeOffValue, 0)} note={`${inr(r.writeOffPending, 0)} more waiting for approval • median report → decision: ${r.medianDecide == null ? '—' : `${Math.round(r.medianDecide)} min`}`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -127,7 +144,7 @@ export default function Reports(_props: { go?: Go }) {
           <table className="w-full text-left text-[11px] border-collapse">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                {['Case', 'Date', 'Order', 'Item', 'Location', 'Reason', 'Ord / found / short', 'Value', 'Outcome', 'Recount', 'Approved by', 'Order status'].map((h) => <th key={h} className="py-2 px-3 whitespace-nowrap">{h}</th>)}
+                {['Case', 'Date', 'Order', 'Item', 'Location', 'Reason', 'Ord / found / short', 'Value', 'Outcome', 'Recount', 'Paperwork', 'Order status'].map((h) => <th key={h} className="py-2 px-3 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
