@@ -2,25 +2,30 @@ import React from 'react';
 import { X, BookOpen } from 'lucide-react';
 
 const SOPS: [string, string[]][] = [
-  ['SOP 1 · Short at pick', [
-    'Tap Short on the pick line. Enter the quantity you actually found and pick one reason.',
-    'Carry on with the other lines. The order is held at packing until the short is resolved.',
+  ['SOP 1 · Picking on the phone', [
+    'Pick the whole order. Tap Short only on a line you cannot fill; enter what you found and one reason.',
+    'When done, tap "Order picked: send to packing". Lines not marked short count as fully picked, and stock is deducted then.',
     'Keep damaged units aside; do not put them back on the shelf.',
   ]],
   ['SOP 2 · Quick search', [
-    'Check only the places StockTrace lists. Each one comes from a Tally record (stock summary or stock journal).',
-    'If there is no record, do not search the godown by hand: the case goes straight to the owner.',
-    'When the search time limit runs out, the case goes to the owner automatically.',
+    'Check only the places StockTrace lists. Each one comes from a record: today\'s purchase receipts, the stock summary, or a recent stock journal.',
+    'If there is no record, do not search the godown by hand: the order goes straight to the owner.',
+    'When the search time limit runs out, it goes to the owner automatically.',
   ]],
-  ['SOP 3 · Owner decision and customer message', [
-    'Choose one outcome: ship partial, backorder, source elsewhere, or cancel the line. Check the bill impact shown for each.',
-    'Edit the drafted message if needed and share it with the customer on WhatsApp before dispatch.',
-    'For backorders against an invoice already raised, confirm the billing approach with your CA.',
+  ['SOP 3 · Owner: one decision per order', [
+    'Decide every short line together: partial, backorder, substitute, source elsewhere or cancel. Record what the customer agreed to.',
+    'Check the bill fix shown: invoice what ships (no invoice yet), cancel the e-invoice within 24 hours and re-issue, or a credit note.',
+    'Share the drafted message on WhatsApp before dispatch. One message per order.',
   ]],
-  ['SOP 4 · Paperwork and recount', [
-    'The accountant reviews every draft (credit note, invoice, stock journal, physical stock) against its source case before posting.',
-    'Credit notes must be declared by 30 November after the financial year of the original invoice, or the annual return date if earlier (CGST s.34(2)).',
-    'Every short creates a recount of that shelf. A difference becomes a physical stock draft; a match means the units should still be on the shelf.',
+  ['SOP 4 · Accountant: daily batch', [
+    'Review drafts once a day and approve in a batch. Time-bound e-invoice cancellations are listed first.',
+    'To cancel an IRN: cancel any active e-way bill first, then the IRN within 24 hours (full cancellation only), then import the new invoice.',
+    'Credit notes must be declared by 30 November after the financial year of the invoice, or the annual return date if earlier (CGST s.34(2)).',
+    'Tally assigns voucher numbers on import. Rejecting a bill draft returns the order to the owner.',
+  ]],
+  ['SOP 5 · Godown in-charge: recount', [
+    'Recount the shelf after the order is picked, so the count is not mixed up with goods in transit.',
+    'Record why the book was wrong. A difference becomes a physical stock draft for the accountant.',
   ]],
 ];
 

@@ -4,6 +4,7 @@ import { COMPANY } from './data/seed.ts';
 import Home from './views/Home.tsx';
 import Picker from './views/Picker.tsx';
 import Owner from './views/Owner.tsx';
+import { useStore } from './store.tsx';
 import Accountant from './views/Accountant.tsx';
 import Reports from './views/Reports.tsx';
 import SopModal from './views/SopModal.tsx';
@@ -17,6 +18,18 @@ const ROLES = [
   ['accountant', 'Accountant'],
   ['reports', 'Reports'],
 ];
+
+function SyncChip() {
+  const { sync } = useStore();
+  const label = !sync.shared ? 'This device only' : !sync.online ? `Offline • ${sync.pending} waiting` : sync.pending ? `Syncing ${sync.pending}` : 'Shared • live';
+  const dot = !sync.shared ? 'bg-slate-400' : !sync.online ? 'bg-amber-500' : 'bg-emerald-500';
+  return (
+    <span id="sync-chip" title={sync.shared ? 'Picker, owner and accountant see the same data' : 'Data is saved in this browser only. Connect Supabase to share across phones.'}
+      className="hidden md:inline-flex items-center space-x-1.5 text-slate-600 bg-slate-50 border border-slate-200/80 px-2 py-1 rounded-md">
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`}></span><span>{label}</span>
+    </span>
+  );
+}
 
 export default function App() {
   const [view, setView] = useState('home');
@@ -62,6 +75,7 @@ export default function App() {
               <span className="text-slate-300">•</span>
               <span className="text-slate-500 font-normal">Demo Environment</span>
             </div>
+            <SyncChip />
             <button id="btn-open-settings" onClick={() => setSettingsOpen(true)} className="text-slate-600 hover:text-slate-950 font-medium px-2 py-1 rounded hover:bg-slate-100 transition-colors cursor-pointer hidden md:inline-flex items-center space-x-1">
               <Settings2 className="w-3.5 h-3.5 text-slate-400" />
               <span>Settings</span>

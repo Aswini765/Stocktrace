@@ -1,7 +1,7 @@
 import type { Go } from './ui.tsx';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Volume2, RotateCcw, ArrowRight, ChevronLeft, Check, Mic, MapPin, ClipboardList, WifiOff, Minus, Plus, AlertTriangle } from 'lucide-react';
-import { useStore, lineState, orderStatus, item, party, shortQty, totalFound } from '../store.tsx';
+import { Volume2, RotateCcw, ArrowRight, ChevronLeft, Check, Mic, MapPin, WifiOff, Minus, Plus, AlertTriangle, PackageCheck, ClipboardList } from 'lucide-react';
+import { useStore, item, party, shortQty, totalFound, lineCase, orderState, orderStatus, dispatchReady, openRecountOnShelf, ROOT_CAUSES, unitLabel } from '../store.tsx';
 import { t, LANGS, parseVoice } from '../i18n.ts';
 import { mins, time } from '../lib/format.ts';
 
@@ -11,17 +11,17 @@ function useNow(ms = 1000) {
   return now;
 }
 
-function speak(text, lang) {
+function speak(text: string, lang: string) {
   try {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = LANGS[lang].speech;
+    u.lang = (LANGS as any)[lang].speech;
     window.speechSynthesis.speak(u);
   } catch { /* speech not available: taps always work */ }
 }
 
-function Bubble({ children, tone = 'bot' }) {
+function Bubble({ children, tone = 'bot' }: { children: React.ReactNode; tone?: string }) {
   if (tone === 'bot') {
     return (
       <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-1.5 shadow-2xs">
@@ -33,47 +33,37 @@ function Bubble({ children, tone = 'bot' }) {
       </div>
     );
   }
-  return (
-    <div className={`rounded-2xl p-3.5 text-xs font-semibold leading-relaxed border shadow-2xs ${tone === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>{children}</div>
-  );
+  return <div className={`rounded-2xl p-3.5 text-xs font-semibold leading-relaxed border shadow-2xs ${tone === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>{children}</div>;
 }
 
-const ORDER_BADGE = {
-  PICKING: 'bg-slate-100 text-slate-700 border-slate-200',
-  HELD: 'bg-amber-50 text-amber-800 border-amber-200',
-  READY: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+const BADGE: Record<string, [string, string]> = {
+  PICKING: ['picking', 'bg-slate-100 text-slate-700 border-slate-200'],
+  HELD: ['held', 'bg-amber-50 text-amber-800 border-amber-200'],
+  READY: ['ready', 'bg-emerald-50 text-emerald-800 border-emerald-200'],
 };
-const ORDER_KEY = { PICKING: 'picking', HELD: 'held', READY: 'ready' };
+const pickerBadge = (state: any, o: any) => (!orderState(state, o.id).picked ? 'PICKING' : dispatchReady(state, o) ? 'READY' : 'HELD');
 
 export default function Picker({ go }: { go: Go }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, sync } = useStore();
   const [lang, setLang] = useState('en');
-  const [tab, setTab] = useState('orders');
+  const [role, setRole] = useState<'picker' | 'incharge'>('picker');
   const [screen, setScreen] = useState<{ name: string; orderId?: string; lineIdx?: number; caseId?: string }>({ name: 'orders' });
-  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const now = useNow();
-
-  useEffect(() => {
-    const on = () => setOnline(true), off = () => setOnline(false);
-    window.addEventListener('online', on); window.addEventListener('offline', off);
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
-  }, []);
 
   const enabledLangs = Object.keys(LANGS).filter((l) => state.settings.languages[l]);
   useEffect(() => { if (!state.settings.languages[lang]) setLang('en'); }, [state.settings.languages, lang]);
 
-  const todays = state.orders.filter((o) => o.id >= 'ORD-1031');
-  const openRecounts = state.recounts.filter((r) => r.status === 'open');
+  const todays = state.orders.filter((o: any) => o.id >= 'ORD-1031');
+  const openRecounts = state.recounts.filter((r: any) => r.status !== 'done');
 
   const prompt = useMemo(() => {
-    if (tab === 'recounts') return openRecounts.length ? t('countNow', lang) : t('noTasks', lang);
+    if (role === 'incharge') return t('countNow', lang);
     if (screen.name === 'short') return `${t('howMany', lang)} ${t('what', lang)}`;
     if (screen.name === 'search') return t('checkThese', lang);
-    return t('greeting', lang);
-  }, [tab, screen.name, lang, openRecounts.length]);
+    return t('defaultPicked', lang);
+  }, [role, screen.name, lang]);
 
-  const subtitle = tab === 'recounts' ? t('recounts', lang)
-    : screen.name === 'order' || screen.name === 'short' || screen.name === 'search' ? screen.orderId : t('orders', lang);
+  const subtitle = role === 'incharge' ? t('recounts', lang) : screen.orderId || t('orders', lang);
 
   return (
     <div className="w-full flex flex-col items-center justify-start pb-12 px-2 sm:px-4">
@@ -81,13 +71,13 @@ export default function Picker({ go }: { go: Go }) {
         <div className="flex items-center justify-between text-xs px-1">
           <div className="flex items-center space-x-1.5">
             <span className="font-bold text-slate-800 text-[11px]">Demo:</span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 rounded font-mono border border-slate-200">Simulated Tally data</span>
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 rounded font-mono border border-slate-200">{sync.shared ? 'Shared data' : 'This device only'}</span>
           </div>
           <div className="flex items-center space-x-2">
             <button id="picker-header-btn-owner" onClick={() => go('owner')} className="text-slate-600 hover:text-slate-900 text-[11px] font-semibold flex items-center space-x-1 cursor-pointer transition-colors">
               <span>Owner View</span><ArrowRight className="w-3 h-3" />
             </button>
-            <button id="picker-btn-reset-demo" onClick={() => { dispatch({ type: 'RESET' }); setScreen({ name: 'orders' }); setTab('orders'); }} className="text-slate-500 hover:text-slate-900 text-[11px] font-semibold flex items-center space-x-1 cursor-pointer transition-colors" title="Reset all demo data">
+            <button id="picker-btn-reset-demo" onClick={() => { dispatch({ type: 'RESET' }); setScreen({ name: 'orders' }); }} className="text-slate-500 hover:text-slate-900 text-[11px] font-semibold flex items-center space-x-1 cursor-pointer transition-colors" title="Reset all demo data">
               <RotateCcw className="w-3 h-3" /><span>Reset</span>
             </button>
           </div>
@@ -107,45 +97,43 @@ export default function Picker({ go }: { go: Go }) {
             <Volume2 className="w-4 h-4" />
           </button>
         </div>
-        <div className="bg-slate-100 px-3 py-1.5 border-b border-slate-200 flex items-center justify-between text-xs">
+        <div className="bg-slate-100 px-3 py-1.5 border-b border-slate-200 flex items-center justify-between text-xs gap-2">
           <div className="inline-flex rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs">
-            {[['orders', t('orders', lang)], ['recounts', `${t('recounts', lang)}${openRecounts.length ? ` (${openRecounts.length})` : ''}`]].map(([id, label]) => (
-              <button key={id} id={`picker-tab-${id}`} onClick={() => { setTab(id); if (id === 'orders') setScreen({ name: 'orders' }); }}
-                className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${tab === id ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>{label}</button>
+            {([['picker', t('rolePicker', lang)], ['incharge', `${t('roleIncharge', lang)}${openRecounts.length ? ` (${openRecounts.length})` : ''}`]] as const).map(([id, label]) => (
+              <button key={id} id={`picker-role-${id}`} onClick={() => { setRole(id); setScreen({ name: 'orders' }); }}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${role === id ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>{label}</button>
             ))}
           </div>
           <div className="inline-flex rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs">
             {enabledLangs.map((l) => (
               <button key={l} id={`picker-lang-${l}`} onClick={() => setLang(l)}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${lang === l ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>{LANGS[l].label}</button>
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${lang === l ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>{(LANGS as any)[l].label}</button>
             ))}
           </div>
         </div>
 
-        {!online && (
+        {(!sync.online || sync.pending > 0) && (
           <div className="bg-slate-800 text-white text-[11px] font-medium px-3 py-1.5 flex items-center space-x-1.5">
-            <WifiOff className="w-3.5 h-3.5" /><span>{t('offline', lang)}</span>
+            <WifiOff className="w-3.5 h-3.5" /><span>{t('offline', lang)}{sync.pending ? ` (${sync.pending})` : ''}</span>
           </div>
         )}
 
         <div className="p-4 sm:p-5 space-y-4 bg-white flex-1 flex flex-col">
-          {tab === 'recounts' && <Recounts lang={lang} />}
-          {tab === 'orders' && screen.name === 'orders' && (
-            <OrderList lang={lang} orders={todays} onOpen={(id) => setScreen({ name: 'order', orderId: id })} />
-          )}
-          {tab === 'orders' && screen.name === 'order' && (
-            <OrderDetail lang={lang} orderId={screen.orderId}
+          {role === 'incharge' && <Recounts lang={lang} />}
+          {role === 'picker' && screen.name === 'orders' && <OrderList lang={lang} orders={todays} onOpen={(id) => setScreen({ name: 'order', orderId: id })} />}
+          {role === 'picker' && screen.name === 'order' && (
+            <OrderDetail lang={lang} orderId={screen.orderId!}
               onBack={() => setScreen({ name: 'orders' })}
               onShort={(lineIdx) => setScreen({ name: 'short', orderId: screen.orderId, lineIdx })}
               onSearch={(caseId) => setScreen({ name: 'search', orderId: screen.orderId, caseId })} />
           )}
-          {tab === 'orders' && screen.name === 'short' && (
-            <ShortForm lang={lang} orderId={screen.orderId} lineIdx={screen.lineIdx}
+          {role === 'picker' && screen.name === 'short' && (
+            <ShortForm lang={lang} orderId={screen.orderId!} lineIdx={screen.lineIdx!}
               onCancel={() => setScreen({ name: 'order', orderId: screen.orderId })}
-              onSent={(caseId) => setScreen({ name: 'search', orderId: screen.orderId, caseId })} />
+              onSent={() => setScreen({ name: 'search', orderId: screen.orderId, lineIdx: screen.lineIdx })} />
           )}
-          {tab === 'orders' && screen.name === 'search' && (
-            <Search lang={lang} caseId={screen.caseId} now={now}
+          {role === 'picker' && screen.name === 'search' && (
+            <Search lang={lang} orderId={screen.orderId!} lineIdx={screen.lineIdx} caseId={screen.caseId} now={now}
               onBack={() => setScreen({ name: 'order', orderId: screen.orderId })} />
           )}
           <div className="text-center pt-2 mt-auto">
@@ -157,25 +145,24 @@ export default function Picker({ go }: { go: Go }) {
   );
 }
 
-function OrderList({ lang, orders, onOpen }) {
+function OrderList({ lang, orders, onOpen }: { lang: string; orders: any[]; onOpen: (id: string) => void }) {
   const { state } = useStore();
   return (
     <div className="space-y-3">
-      <Bubble>{t('greeting', lang)}</Bubble>
+      <Bubble>{t('defaultPicked', lang)}</Bubble>
       <div className="space-y-2">
         {orders.map((o) => {
-          const st = orderStatus(state, o);
-          const p = party(o.party);
-          const done = o.lines.filter((_, i) => lineState(state, o.id, i).status !== 'open').length;
+          const b = pickerBadge(state, o);
+          const shorts = o.lines.filter((_: any, i: number) => lineCase(state, o.id, i)).length;
           return (
             <button key={o.id} id={`picker-order-${o.id}`} onClick={() => onOpen(o.id)}
               className="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-2xs cursor-pointer transition-colors flex items-center justify-between">
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="font-mono text-xs font-bold text-slate-900">{o.id}</span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${ORDER_BADGE[st]}`}>{t(ORDER_KEY[st], lang)}</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${BADGE[b][1]}`}>{t(BADGE[b][0], lang)}</span>
                 </div>
-                <div className="text-[11px] text-slate-600 mt-0.5">{p.name} • {done}/{o.lines.length} • by {time(o.dispatchBy)}</div>
+                <div className="text-[11px] text-slate-600 mt-0.5">{party(o.party).name} • {o.lines.length} • by {time(o.dispatchBy)}{shorts ? ` • ${shorts} ${t('short', lang).toLowerCase()}` : ''}</div>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-400" />
             </button>
@@ -186,21 +173,22 @@ function OrderList({ lang, orders, onOpen }) {
   );
 }
 
-function OrderDetail({ lang, orderId, onBack, onShort, onSearch }) {
+function OrderDetail({ lang, orderId, onBack, onShort, onSearch }: { lang: string; orderId: string; onBack: () => void; onShort: (i: number) => void; onSearch: (id: string) => void }) {
   const { state, dispatch } = useStore();
-  const o = state.orders.find((x) => x.id === orderId);
-  const st = orderStatus(state, o);
+  const o = state.orders.find((x: any) => x.id === orderId);
+  const os = orderState(state, o.id);
+  const b = pickerBadge(state, o);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 flex items-center cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" />{t('back', lang)}</button>
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${ORDER_BADGE[st]}`}>{t(ORDER_KEY[st], lang)}</span>
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${BADGE[b][1]}`}>{t(BADGE[b][0], lang)}</span>
       </div>
-      <div className="text-xs text-slate-600"><span className="font-bold text-slate-900">{party(o.party).name}</span> • {o.invoice ? `Invoice ${o.invoice.no}` : 'Not invoiced yet'}</div>
-      {o.lines.map((l, i) => {
-        const ls = lineState(state, o.id, i);
+      <div className="text-xs text-slate-600"><span className="font-bold text-slate-900">{party(o.party).name}</span> • by {time(o.dispatchBy)}</div>
+      {o.lines.map((l: any, i: number) => {
         const it = item(l.item);
-        const c = ls.caseId && state.cases.find((x) => x.id === ls.caseId);
+        const c = lineCase(state, o.id, i);
+        const flag = !c && !os.picked && openRecountOnShelf(state, l.item, l.godown, l.shelf);
         return (
           <div key={i} id={`picker-line-${o.id}-${i}`} className="border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-2xs">
             <div className="flex items-start justify-between">
@@ -213,33 +201,39 @@ function OrderDetail({ lang, orderId, onBack, onShort, onSearch }) {
                 <div className="text-lg font-black font-mono text-slate-900">{l.qty}</div>
               </div>
             </div>
-            {ls.status === 'open' && (
-              <div className="grid grid-cols-2 gap-2">
-                <button id={`picker-btn-picked-${i}`} onClick={() => dispatch({ type: 'PICK_LINE', orderId: o.id, lineIdx: i })} className="py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm flex items-center justify-center space-x-1.5 shadow-md active:scale-[0.99] transition-all cursor-pointer"><Check className="w-4 h-4" /><span>{t('picked', lang)}</span></button>
-                <button id={`picker-btn-short-${i}`} onClick={() => onShort(i)} className="py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-sm flex items-center justify-center space-x-1.5 shadow-md active:scale-[0.99] transition-all cursor-pointer"><AlertTriangle className="w-4 h-4" /><span>{t('short', lang)}</span></button>
-              </div>
+            {flag && <div className="text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 flex items-center"><AlertTriangle className="w-3.5 h-3.5 mr-1" />{t('countPending', lang)}</div>}
+            {!c && !os.picked && (
+              <button id={`picker-btn-short-${i}`} onClick={() => onShort(i)} className="w-full py-2.5 bg-white border-2 border-rose-500 text-rose-700 hover:bg-rose-50 rounded-xl font-black text-sm flex items-center justify-center space-x-1.5 active:scale-[0.99] transition-all cursor-pointer"><AlertTriangle className="w-4 h-4" /><span>{t('short', lang)}</span></button>
             )}
-            {ls.status === 'picked' && <div className="text-xs font-bold text-emerald-700 flex items-center"><Check className="w-4 h-4 mr-1" />{t('picked', lang)}: {l.qty}</div>}
-            {ls.status === 'short' && c && (
+            {!c && os.picked && <div className="text-xs font-bold text-emerald-700 flex items-center"><Check className="w-4 h-4 mr-1" />{t('picked', lang)}: {l.qty}</div>}
+            {c && (
               <button onClick={() => onSearch(c.id)} className="w-full text-left bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg p-2 text-[11px] text-amber-950 font-semibold flex items-center justify-between cursor-pointer">
-                <span>{c.id}: {totalFound(c)}/{c.ordered} • {shortQty(c) ? `${shortQty(c)} ${t('short', lang).toLowerCase()}` : t('allFound', lang)}</span>
+                <span>{t('short', lang)}: {totalFound(c)}/{c.ordered}{shortQty(c) === 0 ? ` • ${t('allFound', lang)}` : ''}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
         );
       })}
+      {!os.picked ? (
+        <button id="picker-btn-order-picked" onClick={() => dispatch({ type: 'ORDER_PICKED', orderId: o.id, actor: 'Picker' })}
+          className="w-full min-h-[52px] rounded-xl text-sm font-bold flex items-center justify-center space-x-2 shadow-md cursor-pointer transition-all active:scale-[0.99] bg-emerald-600 hover:bg-emerald-700 text-white">
+          <PackageCheck className="w-5 h-5" /><span>{t('donePicking', lang)}</span>
+        </button>
+      ) : (
+        <Bubble tone={dispatchReady(state, o) ? 'info' : 'warn'}>{t('pickedDone', lang)} {dispatchReady(state, o) ? t('canDispatch', lang) : t('waitOwner', lang)}.</Bubble>
+      )}
     </div>
   );
 }
 
-function ShortForm({ lang, orderId, lineIdx, onCancel, onSent }) {
+function ShortForm({ lang, orderId, lineIdx, onCancel, onSent }: { lang: string; orderId: string; lineIdx: number; onCancel: () => void; onSent: () => void }) {
   const { state, dispatch } = useStore();
-  const o = state.orders.find((x) => x.id === orderId);
+  const o = state.orders.find((x: any) => x.id === orderId);
   const l = o.lines[lineIdx];
   const it = item(l.item);
   const [found, setFound] = useState(0);
-  const [reason, setReason] = useState(null);
+  const [reason, setReason] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const SR = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
@@ -247,8 +241,8 @@ function ShortForm({ lang, orderId, lineIdx, onCancel, onSent }) {
     if (!SR) return;
     try {
       const r = new SR();
-      r.lang = LANGS[lang].speech;
-      r.onresult = (e) => {
+      r.lang = (LANGS as any)[lang].speech;
+      r.onresult = (e: any) => {
         const { qty, reason: rs } = parseVoice(e.results[0][0].transcript);
         if (qty != null && qty < l.qty) setFound(qty);
         if (rs) setReason(rs);
@@ -259,13 +253,7 @@ function ShortForm({ lang, orderId, lineIdx, onCancel, onSent }) {
     } catch { setListening(false); }
   };
 
-  const submit = () => {
-    const before = state.counters.case;
-    dispatch({ type: 'REPORT_SHORT', orderId, lineIdx, found, reason, actor: 'Picker' });
-    onSent(`CASE-${String(before + 1).padStart(4, '0')}`);
-  };
-
-  const REASON_BTN = {
+  const REASON_BTN: Record<string, string> = {
     not_found: 'bg-rose-600 hover:bg-rose-700',
     fewer: 'bg-slate-800 hover:bg-slate-900',
     damaged: 'bg-amber-600 hover:bg-amber-700',
@@ -307,18 +295,19 @@ function ShortForm({ lang, orderId, lineIdx, onCancel, onSent }) {
       )}
       <div className="grid grid-cols-2 gap-2">
         <button onClick={onCancel} className="py-3 rounded-xl text-sm font-bold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 cursor-pointer">{t('cancel', lang)}</button>
-        <button id="picker-btn-send-short" disabled={!reason} onClick={submit} className="py-3 rounded-xl text-sm font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white cursor-pointer disabled:cursor-not-allowed">{t('send', lang)}</button>
+        <button id="picker-btn-send-short" disabled={!reason} onClick={() => { dispatch({ type: 'REPORT_SHORT', orderId, lineIdx, found, reason, actor: 'Picker' }); onSent(); }}
+          className="py-3 rounded-xl text-sm font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white cursor-pointer disabled:cursor-not-allowed">{t('send', lang)}</button>
       </div>
     </div>
   );
 }
 
-function Search({ lang, caseId, now, onBack }) {
+function Search({ lang, orderId, lineIdx, caseId, now, onBack }: { lang: string; orderId: string; lineIdx?: number; caseId?: string; now: number; onBack: () => void }) {
   const { state, dispatch } = useStore();
-  const c = state.cases.find((x) => x.id === caseId);
-  const [asking, setAsking] = useState(null);
+  const c = caseId ? state.cases.find((x: any) => x.id === caseId) : lineCase(state, orderId, lineIdx!);
+  const [asking, setAsking] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
-  if (!c) return null;
+  if (!c) return <Bubble tone="info">…</Bubble>;
   const it = item(c.item);
   const remaining = Math.min(c.searchDeadline - now, c.searchDeadline - c.reportedAt);
   const searching = !c.outcome && !c.escalatedAt;
@@ -339,7 +328,7 @@ function Search({ lang, caseId, now, onBack }) {
             <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('checkThese', lang)}</div>
             {searching && <div className="text-[11px] font-mono text-slate-500">{t('timeLeft', lang)}: <strong className="text-slate-900">{mins(remaining)}</strong></div>}
           </div>
-          {c.suggestions.map((s) => (
+          {c.suggestions.map((s: any) => (
             <div key={s.key} className="border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-bold text-slate-900 flex items-center"><MapPin className="w-3.5 h-3.5 mr-1 text-teal-700" />{s.godown} • <span className="font-mono ml-1">{s.shelf}</span></div>
@@ -364,37 +353,53 @@ function Search({ lang, caseId, now, onBack }) {
         </div>
       )}
       {status}
-      {searching && (
-        <button onClick={() => dispatch({ type: 'ESCALATE', caseId: c.id, why: 'picker' })} className="w-full py-2.5 rounded-xl text-xs font-bold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 cursor-pointer">{t('sendNow', lang)}</button>
-      )}
+      {searching && <button onClick={() => dispatch({ type: 'ESCALATE', caseId: c.id, why: 'picker', actor: 'Picker' })} className="w-full py-2.5 rounded-xl text-xs font-bold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 cursor-pointer">{t('sendNow', lang)}</button>}
+      <button onClick={onBack} className="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white cursor-pointer">{t('back', lang)}: {c.orderId}</button>
     </div>
   );
 }
 
-function Recounts({ lang }) {
+function Recounts({ lang }: { lang: string }) {
   const { state, dispatch } = useStore();
-  const open = state.recounts.filter((r) => r.status === 'open');
-  const [vals, setVals] = useState({});
-  const [saved, setSaved] = useState(null);
+  const list = state.recounts.filter((r: any) => r.status !== 'done');
+  const [vals, setVals] = useState<Record<string, string>>({});
   return (
     <div className="space-y-3">
-      <Bubble>{open.length ? t('countNow', lang) : t('noTasks', lang)}</Bubble>
-      {saved && <div className="text-[11px] font-bold text-emerald-700 flex items-center"><Check className="w-3.5 h-3.5 mr-1" />{t('countSaved', lang)} ({saved})</div>}
-      {open.map((r) => {
+      <Bubble>{list.length ? t('countNow', lang) : t('noTasks', lang)}</Bubble>
+      {list.map((r: any) => {
         const it = item(r.item);
+        const c = state.cases.find((x: any) => x.id === r.caseId);
+        const ready = orderState(state, c.orderId).picked;
         return (
           <div key={r.id} id={`recount-${r.id}`} className="border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="text-sm font-bold text-slate-900">{it.name}</div>
-              <span className="font-mono text-[10px] text-slate-500">{r.id} • {r.caseId}</span>
+              <span className="font-mono text-[10px] text-slate-500">{r.id}</span>
             </div>
             <div className="text-[11px] text-slate-600 flex items-center"><ClipboardList className="w-3 h-3 mr-1" />{r.godown} • {t('shelf', lang)} <span className="font-mono font-bold text-slate-900 ml-1">{r.shelf}</span></div>
-            <div className="flex items-center space-x-2">
-              <input type="number" min="0" inputMode="numeric" placeholder="0" value={vals[r.id] ?? ''} onChange={(e) => setVals({ ...vals, [r.id]: e.target.value })}
-                className="flex-1 text-center text-lg font-black font-mono p-2 rounded-xl border border-slate-300 bg-slate-50 outline-none focus:border-slate-900" />
-              <button disabled={vals[r.id] === undefined || vals[r.id] === ''} onClick={() => { dispatch({ type: 'RECOUNT_DONE', recountId: r.id, counted: Math.floor(Number(vals[r.id])) }); setSaved(r.id); }}
-                className="h-12 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl text-xs font-bold cursor-pointer">{t('saveCount', lang)}</button>
-            </div>
+            {r.status === 'open' && !ready && <div className="text-[11px] text-slate-500">{t('afterPicking', lang)} ({c.orderId})</div>}
+            {r.status === 'open' && ready && (
+              <div className="flex items-center space-x-2">
+                <input type="number" min="0" inputMode="numeric" placeholder="0" value={vals[r.id] ?? ''} onChange={(e) => setVals({ ...vals, [r.id]: e.target.value })}
+                  className="flex-1 text-center text-lg font-black font-mono p-2 rounded-xl border border-slate-300 bg-slate-50 outline-none focus:border-slate-900" />
+                <button disabled={vals[r.id] === undefined || vals[r.id] === ''} onClick={() => dispatch({ type: 'RECOUNT_DONE', recountId: r.id, counted: Math.floor(Number(vals[r.id])), actor: 'Godown in-charge' })}
+                  className="h-12 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl text-xs font-bold cursor-pointer">{t('saveCount', lang)}</button>
+              </div>
+            )}
+            {r.status === 'needs_cause' && (
+              <div className="space-y-2">
+                <div className={`text-xs font-bold ${r.diff === 0 ? 'text-emerald-700' : 'text-amber-800'}`}>
+                  {r.diff === 0 ? t('matchesBook', lang) : `${t('differs', lang)} ${r.diff > 0 ? '+' : ''}${r.diff} ${unitLabel(it.unit, Math.abs(r.diff))}`}
+                </div>
+                <div className="text-[11px] font-bold text-slate-700">{t('whyDifferent', lang)}</div>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {Object.entries(ROOT_CAUSES).filter(([k]) => (r.diff === 0 ? ['missed_on_shelf', 'unexplained'].includes(k) : k !== 'missed_on_shelf')).map(([k, v]) => (
+                    <button key={k} id={`cause-${r.id}-${k}`} onClick={() => dispatch({ type: 'RECOUNT_CAUSE', recountId: r.id, cause: k, actor: 'Godown in-charge' })}
+                      className="text-left text-[12px] font-semibold px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer">{v}</button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}

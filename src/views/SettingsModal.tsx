@@ -4,7 +4,7 @@ import { useStore, REASONS } from '../store.tsx';
 import { LANGS } from '../i18n.ts';
 
 export default function SettingsModal({ onClose }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, sync } = useStore();
   const s = state.settings;
   const set = (patch) => dispatch({ type: 'UPDATE_SETTINGS', settings: patch });
   return (
@@ -23,7 +23,7 @@ export default function SettingsModal({ onClose }) {
           <label className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex items-center justify-between cursor-pointer">
             <div>
               <div className="text-slate-700 font-semibold">E-invoicing applies to this business</div>
-              <div className="text-[10px] text-slate-400">Flags credit notes and invoices that need an IRN after posting.</div>
+              <div className="text-[10px] text-slate-400">Above ₹5 crore turnover. Decides the bill fix: cancel the IRN within 24 hours and re-issue, otherwise a credit note. Off: cancel and re-issue (confirm with your CA).</div>
             </div>
             <input type="checkbox" checked={s.eInvoicing} onChange={(e) => set({ eInvoicing: e.target.checked })} className="accent-slate-900 w-4 h-4" />
           </label>
@@ -43,11 +43,15 @@ export default function SettingsModal({ onClose }) {
             <div className="flex flex-wrap gap-1.5">{Object.values(REASONS).map((r) => <span key={r} className="bg-white border border-slate-200 px-2 py-0.5 rounded">{r}</span>)}</div>
           </div>
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
+            <div className="text-slate-700 font-semibold">Shared data</div>
+            <div className="text-[11px] text-slate-600">{sync.shared ? `Connected: every phone and laptop sees the same orders.${sync.pending ? ` ${sync.pending} change(s) waiting to sync.` : ''}` : 'Not connected: data stays in this browser. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY at build time to share it.'}</div>
+          </div>
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
             <div className="text-slate-700 font-semibold">Approval rules (fixed)</div>
             <ul className="list-disc list-inside text-[11px] text-slate-600 space-y-0.5">
-              <li>Pickers report and count; they never decide or approve.</li>
-              <li>Only the owner chooses an order's outcome and sends customer messages.</li>
-              <li>Only the accountant approves vouchers for Tally.</li>
+              <li>Pickers report shorts and finish the pick; the godown in-charge recounts and records the cause. Neither decides or approves.</li>
+              <li>Only the owner decides an order (once for all its short lines) and sends the customer message.</li>
+              <li>Only the accountant approves drafts; Tally assigns every voucher number.</li>
             </ul>
           </div>
         </div>

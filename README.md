@@ -1,4 +1,4 @@
-# StockTrace v2 — Short-Supply Resolution for SME distributors on Tally
+# StockTrace v2.1 — Short-Supply Resolution for SME distributors on Tally
 
 StockTrace helps a small distributor resolve an order that cannot ship in full, end to end: the picker reports the short, a quick search checks only places that have a Tally record behind them, the owner decides what happens to the order, StockTrace drafts the credit note / invoice / stock entries for the accountant to approve, the customer gets a message, and a recount stops the same gap recurring.
 
@@ -10,23 +10,30 @@ v2 follows the requirements doc "StockTrace — Requirements & End-to-End Flow (
 
 ## Capabilities & Implementation Status
 
+v2.1 reworks the flow around how each role actually works: the picker is on a phone, the owner decides per order, the accountant works in a daily batch, and Tally owns voucher numbering.
+
 | Feature | Status | Details |
 |---|---|---|
-| Picker pick list, Picked / Short per line (FR-1.2, 2.1–2.3) | **Working** | Short = quantity found + one of 4 reasons. Order is held at packing until resolved. |
-| English · हिंदी · ಕನ್ನಡ, read-aloud, voice input (FR-2.4) | **Working (prototype)** | Uses the phone's speech engine where available; taps always work. |
-| Cited quick search (FR-3.1, 3.2) | **Working** | Suggests only locations from Tally stock summary or recent stock journals, with the record shown. No record → no suggestion. Owner-set time limit, then auto-escalation. |
-| Owner decision queue (FR-4.1–4.3) | **Working** | Ship partial, backorder, source elsewhere, cancel line; bill impact shown before confirming. |
-| Draft credit note / sales invoice / stock journal / physical stock (FR-5.1–5.3) | **Working** | Credit note references the original invoice; CGST+SGST vs IGST by place of supply; invoice for shipped qty when not invoiced yet. |
-| Accountant approval, reject-with-reason (FR-5.4, 8.1) | **Working** | Rejecting returns the case to the owner with the note. |
-| s.34(2) deadline warning, e-invoice IRN flag (FR-5.5) | **Working** | Deadline = 30 Nov after the FY of the original invoice (or annual return date, if earlier). |
-| Customer message via WhatsApp share (FR-6.1) | **Working** | Drafted per outcome, editable, opened with `wa.me` share link. |
-| Recount task per short (FR-7.1, 7.2) | **Working** | Blind count; a difference becomes a Physical Stock draft. |
-| Discrepancy log, monthly report, CSV export (FR-7.3, 7.4) | **Working** | Shorts per 1,000 order lines, value, credit notes, write-offs; computed from case data only. |
-| Audit trail (FR-8.2) | **Working** | Every report, decision, approval and message, time-stamped with the actor. |
-| Tally XML export of posted vouchers | **Draft** | Starting point for Tally import. Ledger names must match your company: test on a sample company first. |
-| Live TallyPrime connector (FR-1.1) | **Not built** | Items, stock, orders and invoices are **sample data** in `src/data/seed.ts`. |
-| Backend database / multi-user sync | **Not built** | State is kept in the browser (localStorage). Offline banner shows when the phone loses signal. |
-| WhatsApp Business API (FR-6.2) | **Not built** | Share link only. |
+| Picker on the phone: report shorts only, then "Order picked" | **Working** | Lines not marked short count as fully picked; stock is deducted at "Order picked" (SAP EWM-style pick denial, not per-line confirmation). |
+| English · हिंदी · ಕನ್ನಡ, read-aloud, voice input | **Working (prototype)** | Uses the phone's speech engine where available; taps always work. |
+| Cited quick search | **Working** | Only places with a record: today's purchase receipts (goods not yet shelved), Tally stock summary, stock journals in the last 14 days. No record → straight to the owner. Time limit, then auto-escalation. |
+| Owner: one decision per order | **Working** | All short lines decided together: partial, backorder, substitute (from a mapped alternative with stock), source elsewhere, cancel line. Records what the customer agreed to. One customer message per order. |
+| Correct bill fix (GST) | **Working** | No invoice yet → invoice what ships. E-invoice under 24 h → cancel IRN and re-issue (cancel e-way bill first). Over 24 h → credit note. Not on e-invoicing → cancel and re-issue (confirm with CA). |
+| Accountant daily batch | **Working** | Select and approve together; time-bound IRN cancellations first; step list per draft; s.34(2) deadline; reject with reason returns the order to the owner and reverses substitute stock. |
+| Tally XML | **Draft** | No voucher numbers in the XML: Tally assigns them on import. Ledger names must match your company: test on a sample company first. |
+| Recount by the godown in-charge | **Working** | Starts after the order is picked; one recount per shelf even with several shorts; root cause required; a difference becomes a Physical Stock draft. |
+| Reports | **Working** | Shorts per 1,000 lines, value, credit notes vs re-issues, write-offs, recount causes, open backorders, CSV log. |
+| Shared data across phones (Supabase) | **Working, needs setup** | Append-only event log, replayed the same way on every device; offline outbox; live updates. Without setup, data stays in one browser (header shows "This device only"). |
+| Live TallyPrime connector | **Not built** | Items, stock, orders and invoices are **sample data** in `src/data/seed.ts`. |
+| WhatsApp Business API | **Not built** | Share link only. |
+
+### Turning on shared data
+
+1. In Supabase → SQL editor, run `supabase/migrations/20261112_stocktrace_events.sql`.
+2. In Render → the StockTrace static site → Environment, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Project Settings → API). Optionally `VITE_STOCKTRACE_WORKSPACE`.
+3. Redeploy (Vite reads these at build time). The header chip changes to "Shared • live".
+
+The included row-level-security policy lets anyone with the anon key read and append to the `demo` workspace. That is fine for a demo, not for real customer data: add Supabase Auth and per-company policies first.
 
 All company names, GSTINs, item rates and GST rates are fictional demo values.
 
@@ -63,12 +70,12 @@ To replace the current `stocktrace-i150` service, point that service at this rep
 
 ## Demo walkthrough (the professor's example)
 
-1. **Picker** → ORD-1031 → mark Modular Switch *Picked* → LED Bulb *Short*: found 98 of 100, reason *Not found*.
-2. StockTrace lists one place to check, Back Store / BS-1, citing the stock summary and stock journal SJ-0412. Tap *Not here*.
-3. **Owner** → CASE-0003 → *Ship partial, cancel the rest*. Bill impact: credit note 2 × ₹650 + GST = ₹1,534.00 against INV-2611. Confirm, then share the drafted WhatsApp message.
-4. **Accountant** → review the credit note (CGST ₹117 + SGST ₹117, s.34(2) deadline) → *Approve and post* → download Tally XML.
-5. **Picker** → Recounts → count Main Godown / R2-B. A difference creates a Physical Stock draft for the accountant.
-6. **Reports** → the case appears in the discrepancy log; export CSV for the CA.
+1. **Picker** (phone) → ORD-1031 → LED Bulb *Short*: found 2 of 100, reason *Not found*.
+2. StockTrace lists places with a record: Receiving Area (purchase PUR-0388 received today, not yet shelved) and Back Store (stock summary + stock journal). Check them, or *Send to owner now*. Back to the order → *Order picked: send to packing*.
+3. **Owner** → ORD-1031 → *Ship partial*, customer *agreed* → confirm. Because INV-2611's e-invoice is under 24 hours old, the fix is: cancel the IRN and re-issue for what ships, no credit note. Share the WhatsApp message.
+4. **Accountant** → the re-issue draft is at the top with its deadline and steps → *Approve selected* → download Tally XML.
+5. **Picker → Godown in-charge** → recount Main Godown / R2-B, then record why the book was wrong. A difference becomes a Physical Stock draft.
+6. **Reports** → the case appears in the log with its order status and cause; export CSV for the CA.
 
 Use *Reset* on the Picker screen to restore the demo data.
 
@@ -77,11 +84,14 @@ Use *Reset* on the Picker screen to restore the demo data.
 ```
 server.ts                 Express: security headers, /health, static dist with SPA fallback
 src/data/seed.ts          Sample Tally data (items, godowns, stock, stock journals, parties, orders)
-src/store.tsx             State, reducer (every action of the flow), selectors, persistence
+src/core.ts               Reducer (every action of the flow), selectors, correction route
+src/store.tsx             React provider: event replay, dispatch, escalation timer
+src/sync.ts               Supabase event log + offline outbox (or this-device storage)
+supabase/migrations/      Event table, demo RLS policy, realtime
 src/lib/search.ts         Cited quick-search suggestions
 src/lib/tax.ts            GST split, s.34(2) deadline
-src/lib/tally.ts          Tally XML for posted vouchers
+src/lib/tally.ts          Tally XML for approved drafts (no voucher numbers)
 src/i18n.ts               Picker strings in English, Hindi, Kannada; voice parser
 src/views/                Home, Picker, Owner, Accountant, Reports, SOP and Settings modals
-tests/flow.test.ts        10 end-to-end flow tests
+tests/flow.test.ts        17 end-to-end flow tests
 ```

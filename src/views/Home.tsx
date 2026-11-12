@@ -1,7 +1,7 @@
 import type { Go } from './ui.tsx';
 import React from 'react';
 import { Smartphone, Scale, FileCheck2, ArrowRight } from 'lucide-react';
-import { useStore, caseStatus } from '../store.tsx';
+import { useStore, orderStatus } from '../store.tsx';
 import { COMPANY } from '../data/seed.ts';
 
 function RoleCard({ id, tag, tagCls, hover, icon: Icon, title, body, chips, cta, onClick }) {
@@ -39,11 +39,11 @@ function Stat({ label, value, note, tone = 'text-slate-950' }) {
 
 export default function Home({ go }: { go: Go }) {
   const { state } = useStore();
-  const statuses = state.cases.map((c) => caseStatus(state, c));
-  const open = statuses.filter((s) => s !== 'CLOSED').length;
-  const owner = statuses.filter((s) => s === 'AWAITING_OWNER' || s === 'MESSAGE_PENDING').length;
+  const statuses = state.orders.filter((o: any) => state.cases.some((c: any) => c.orderId === o.id)).map((o: any) => orderStatus(state, o));
+  const open = statuses.filter((s: string) => s !== 'CLOSED').length;
+  const owner = statuses.filter((s: string) => s === 'AWAITING_OWNER' || s === 'MESSAGE_PENDING').length;
   const drafts = state.drafts.filter((d) => d.status === 'pending').length;
-  const recounts = state.recounts.filter((r) => r.status === 'open').length;
+  const recounts = state.recounts.filter((r: any) => r.status !== 'done').length;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-10">

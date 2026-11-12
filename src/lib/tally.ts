@@ -8,9 +8,10 @@ const amt = (n) => Number(n).toFixed(2);
 // Draft Tally XML for a posted voucher. Ledger names (Sales, Output CGST, ...) must match the
 // company's own ledgers: import into a test company first. This is a starting point, not a certified integration.
 export function voucherXml(d) {
-  const date = tallyDate(d.postedAt || d.createdAt);
+  const date = tallyDate(d.approvedAt || d.createdAt);
+  // No VOUCHERNUMBER: Tally assigns numbers in its own series.
   let body = '';
-  if (d.type === 'credit_note' || d.type === 'sales_invoice') {
+  if (d.type === 'credit_note' || d.type === 'sales_invoice' || d.type === 'reissue') {
     const p = PARTIES[d.party];
     const t = taxLines(d.lines, p);
     const isCN = d.type === 'credit_note';
@@ -42,7 +43,6 @@ export function voucherXml(d) {
       <VOUCHER VCHTYPE="${isCN ? 'Credit Note' : 'Sales'}" ACTION="Create" OBJVIEW="Invoice Voucher View">
         <DATE>${date}</DATE>
         <VOUCHERTYPENAME>${isCN ? 'Credit Note' : 'Sales'}</VOUCHERTYPENAME>
-        <VOUCHERNUMBER>${esc(d.voucherNo || d.id)}</VOUCHERNUMBER>
         <PARTYLEDGERNAME>${esc(p.name)}</PARTYLEDGERNAME>
         <PARTYGSTIN>${esc(p.gstin)}</PARTYGSTIN>
         <PLACEOFSUPPLY>${esc(p.state)}</PLACEOFSUPPLY>
@@ -63,7 +63,6 @@ export function voucherXml(d) {
       <VOUCHER VCHTYPE="Stock Journal" ACTION="Create">
         <DATE>${date}</DATE>
         <VOUCHERTYPENAME>Stock Journal</VOUCHERTYPENAME>
-        <VOUCHERNUMBER>${esc(d.voucherNo || d.id)}</VOUCHERNUMBER>
         <NARRATION>${esc(d.narration)}</NARRATION>
         <INVENTORYENTRIESOUT.LIST>
           <STOCKITEMNAME>${esc(it.name)}</STOCKITEMNAME>
@@ -84,7 +83,6 @@ export function voucherXml(d) {
       <VOUCHER VCHTYPE="Physical Stock" ACTION="Create">
         <DATE>${date}</DATE>
         <VOUCHERTYPENAME>Physical Stock</VOUCHERTYPENAME>
-        <VOUCHERNUMBER>${esc(d.voucherNo || d.id)}</VOUCHERNUMBER>
         <NARRATION>${esc(d.narration)}</NARRATION>
         <INVENTORYENTRIESIN.LIST>
           <STOCKITEMNAME>${esc(it.name)}</STOCKITEMNAME>

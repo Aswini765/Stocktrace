@@ -79,6 +79,22 @@ const T = {
   speak: { en: 'Speak', hi: 'बोलें', kn: 'ಮಾತನಾಡಿ' },
   listening: { en: 'Listening…', hi: 'सुन रहा है…', kn: 'ಕೇಳುತ್ತಿದೆ…' },
   done: { en: 'Done', hi: 'पूरा', kn: 'ಮುಗಿದಿದೆ' },
+  donePicking: { en: 'Order picked: send to packing', hi: 'ऑर्डर पिक हो गया: पैकिंग पर भेजें', kn: 'ಆರ್ಡರ್ ಪಿಕ್ ಆಯಿತು: ಪ್ಯಾಕಿಂಗ್‌ಗೆ ಕಳುಹಿಸಿ' },
+  defaultPicked: {
+    en: 'Pick from your slip as usual. Tap Short only if a quantity is missing.',
+    hi: 'हमेशा की तरह पर्ची से पिक करें। मात्रा कम हो तभी "कम है" दबाएँ।',
+    kn: 'ಎಂದಿನಂತೆ ಚೀಟಿಯಿಂದ ಪಿಕ್ ಮಾಡಿ. ಪ್ರಮಾಣ ಕಡಿಮೆ ಇದ್ದರೆ ಮಾತ್ರ "ಕಡಿಮೆ ಇದೆ" ಒತ್ತಿ.',
+  },
+  countPending: { en: 'Count pending on this shelf: check carefully', hi: 'इस शेल्फ की गिनती बाकी है: ध्यान से देखें', kn: 'ಈ ಶೆಲ್ಫ್ ಎಣಿಕೆ ಬಾಕಿ ಇದೆ: ಎಚ್ಚರಿಕೆಯಿಂದ ನೋಡಿ' },
+  rolePicker: { en: 'Picker', hi: 'पिकर', kn: 'ಪಿಕರ್' },
+  roleIncharge: { en: 'Godown in-charge', hi: 'गोदाम इंचार्ज', kn: 'ಗೋದಾಮು ಇನ್‌ಚಾರ್ಜ್' },
+  matchesBook: { en: 'Count matches the book.', hi: 'गिनती रिकॉर्ड से मेल खाती है।', kn: 'ಎಣಿಕೆ ದಾಖಲೆಗೆ ಹೊಂದುತ್ತದೆ.' },
+  differs: { en: 'Count differs from the book by', hi: 'गिनती रिकॉर्ड से इतनी अलग है:', kn: 'ಎಣಿಕೆ ದಾಖಲೆಗಿಂತ ಇಷ್ಟು ಭಿನ್ನ:' },
+  whyDifferent: { en: 'What is the most likely reason?', hi: 'सबसे संभावित कारण क्या है?', kn: 'ಹೆಚ್ಚು ಸಂಭವನೀಯ ಕಾರಣ ಯಾವುದು?' },
+  afterPicking: { en: 'Count after this order is picked', hi: 'यह ऑर्डर पिक होने के बाद गिनें', kn: 'ಈ ಆರ್ಡರ್ ಪಿಕ್ ಆದ ನಂತರ ಎಣಿಸಿ' },
+  pickedDone: { en: 'Sent to packing.', hi: 'पैकिंग पर भेज दिया।', kn: 'ಪ್ಯಾಕಿಂಗ್‌ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ.' },
+  waitOwner: { en: 'Wait: owner is deciding the short items', hi: 'रुकें: मालिक कम सामान पर फैसला कर रहे हैं', kn: 'ನಿಲ್ಲಿ: ಕಡಿಮೆ ವಸ್ತುಗಳ ಬಗ್ಗೆ ಮಾಲೀಕರು ನಿರ್ಧರಿಸುತ್ತಿದ್ದಾರೆ' },
+  canDispatch: { en: 'Ready to pack and dispatch', hi: 'पैक और डिस्पैच के लिए तैयार', kn: 'ಪ್ಯಾಕ್ ಮತ್ತು ರವಾನೆಗೆ ಸಿದ್ಧ' },
 };
 
 export const t = (key, lang) => T[key]?.[lang] || T[key]?.en || key;

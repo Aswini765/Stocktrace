@@ -1,149 +1,131 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ArrowLeft, Clock, Search, ShieldCheck, MapPin, MessageCircle, Copy, PackageCheck, AlertTriangle, CheckCircle2, ClipboardList } from 'lucide-react';
-import { useStore, caseStatus, shortQty, totalFound, item, party, REASONS, OUTCOMES, DRAFT_LABEL, caseDrafts, caseRecount, unitLabel } from '../store.tsx';
-import { StatusBadge, Panel, Field, PageHeader, AuditTrail , type Go } from './ui.tsx';
-import { inr, time, dateTime, mins } from '../lib/format.ts';
-import { taxLines } from '../lib/tax.ts';
+import { ArrowRight, ArrowLeft, Clock, ShieldCheck, MapPin, MessageCircle, Copy, PackageCheck, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Phone } from 'lucide-react';
+import {
+  useStore, orderStatus, orderCases, orderState, orderDrafts, shortQty, totalFound, item, party, REASONS, OUTCOMES, CUSTOMER_CHOICES,
+  DRAFT_LABEL, caseRecount, substitutesFor, billChange, correctionRoute, isFound, ROOT_CAUSES,
+} from '../store.tsx';
+import { StatusBadge, PageHeader, AuditTrail, type Go } from './ui.tsx';
+import { inr, time, dateTime } from '../lib/format.ts';
 
-const OPEN = ['SEARCHING', 'AWAITING_OWNER', 'MESSAGE_PENDING', 'AWAITING_APPROVAL', 'AWAITING_STOCK', 'AWAITING_RECOUNT'];
+const NEEDS_OWNER = ['SEARCHING', 'AWAITING_OWNER', 'MESSAGE_PENDING', 'AWAITING_STOCK'];
 
-export default function Owner({ go, initialCase }: { go: Go; initialCase: string | null }) {
-  const [caseId, setCaseId] = useState(initialCase);
-  return caseId
-    ? <CaseDetail caseId={caseId} onBack={() => setCaseId(null)} go={go} />
-    : <CaseList onOpen={setCaseId} />;
+function useNow(ms = 30000) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  return now;
+}
+function dueText(dispatchBy: number, now: number) {
+  const m = Math.round((dispatchBy - now) / 60000);
+  if (m < 0) return { text: `Dispatch time passed ${time(dispatchBy)}`, cls: 'text-rose-700' };
+  const h = Math.floor(m / 60);
+  return { text: `Truck leaves in ${h ? `${h}h ` : ''}${m % 60}m (${time(dispatchBy)})`, cls: m < 120 ? 'text-amber-700' : 'text-slate-600' };
 }
 
-function CaseList({ onOpen }) {
+export default function Owner({ go, initialCase }: { go: Go; initialCase: string | null }) {
   const { state } = useStore();
-  const [q, setQ] = useState('');
-  const [filter, setFilter] = useState('open');
-  const rows = useMemo(() => state.cases.map((c) => {
-    const o = state.orders.find((x) => x.id === c.orderId);
-    return { c, o, st: caseStatus(state, c), it: item(c.item), p: party(o.party) };
-  }), [state]);
-  const openCount = rows.filter((r) => OPEN.includes(r.st)).length;
+  const initialOrder = initialCase ? (state.cases.find((c: any) => c.id === initialCase)?.orderId || initialCase) : null;
+  const [orderId, setOrderId] = useState<string | null>(initialOrder);
+  return orderId ? <OrderDetail orderId={orderId} onBack={() => setOrderId(null)} go={go} /> : <OrderQueue onOpen={setOrderId} />;
+}
+
+function OrderQueue({ onOpen }: { onOpen: (id: string) => void }) {
+  const { state } = useStore();
+  const now = useNow();
+  const [filter, setFilter] = useState('mine');
+  const rows = useMemo(() => state.orders
+    .filter((o: any) => orderCases(state, o.id).length)
+    .map((o: any) => ({ o, st: orderStatus(state, o), cases: orderCases(state, o.id) })), [state]);
+  const counts = { mine: rows.filter((r: any) => NEEDS_OWNER.includes(r.st)).length, open: rows.filter((r: any) => r.st !== 'CLOSED').length, all: rows.length };
   const shown = rows
-    .filter((r) => filter === 'all' || (filter === 'open' ? OPEN.includes(r.st) : r.st === filter))
-    .filter((r) => !q || `${r.c.id} ${r.o.id} ${r.it.code} ${r.it.name} ${r.p.name} ${r.c.shelf}`.toLowerCase().includes(q.toLowerCase()))
-    .sort((a, b) => (a.st === 'AWAITING_OWNER' ? -1 : 0) - (b.st === 'AWAITING_OWNER' ? -1 : 0) || a.o.dispatchBy - b.o.dispatchBy);
+    .filter((r: any) => (filter === 'mine' ? NEEDS_OWNER.includes(r.st) : filter === 'open' ? r.st !== 'CLOSED' : true))
+    .sort((a: any, b: any) => a.o.dispatchBy - b.o.dispatchBy);
 
   return (
-    <div className="space-y-5 max-w-6xl mx-auto w-full">
-      <PageHeader title="Owner Decision Queue" sub="Every short order with its value and dispatch deadline. Choose what happens to the order; StockTrace drafts the paperwork." />
-      <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-2 flex-1">
-          <div className="relative min-w-[200px] max-w-xs flex-1">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search case, order, item, customer, shelf..." className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-slate-400" />
-          </div>
-          <select id="owner-status-filter" value={filter} onChange={(e) => setFilter(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs text-slate-700 cursor-pointer focus:outline-none">
-            <option value="open">Status: Open ({openCount})</option>
-            <option value="all">Status: All ({rows.length})</option>
-            <option value="AWAITING_OWNER">Owner to decide</option>
-            <option value="MESSAGE_PENDING">Message to send</option>
-            <option value="AWAITING_APPROVAL">Accountant to approve</option>
-            <option value="AWAITING_RECOUNT">Recount pending</option>
-            <option value="CLOSED">Closed</option>
-          </select>
-        </div>
-        <div className="text-slate-500 text-[11px] font-mono shrink-0">Showing <strong>{shown.length}</strong> of {rows.length} cases</div>
+    <div className="space-y-5 max-w-5xl mx-auto w-full">
+      <PageHeader title="Owner: short orders" sub="One card per order. Decide once for the whole order, tell the customer once, and StockTrace prepares the paperwork." />
+      <div className="inline-flex rounded-lg bg-slate-100 border border-slate-200 p-1 text-xs font-semibold">
+        {([['mine', 'Needs me'], ['open', 'All open'], ['all', 'All']] as const).map(([k, label]) => (
+          <button key={k} id={`owner-filter-${k}`} onClick={() => setFilter(k)} className={`px-3 py-1.5 rounded-md cursor-pointer transition-colors ${filter === k ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>{label} ({counts[k]})</button>
+        ))}
       </div>
-      <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
-                <th className="py-2.5 px-3.5">Case ID</th><th className="py-2.5 px-3.5">Order & Customer</th><th className="py-2.5 px-3.5">Item</th>
-                <th className="py-2.5 px-3.5">Short</th><th className="py-2.5 px-3.5">Short value</th><th className="py-2.5 px-3.5">Reason</th>
-                <th className="py-2.5 px-3.5">Dispatch by</th><th className="py-2.5 px-3.5">Status</th><th className="py-2.5 px-3.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {shown.map(({ c, o, st, it, p }) => (
-                <tr key={c.id} id={`case-row-${c.id}`} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="py-3 px-3.5 font-mono text-[11px]">
-                    <div className="font-bold text-slate-900">{c.id}</div>
-                    <div className="text-slate-400 text-[10px] flex items-center space-x-1 mt-0.5"><Clock className="w-3 h-3" /><span>{time(c.reportedAt)}</span></div>
-                  </td>
-                  <td className="py-3 px-3.5">
-                    <div className="font-mono font-bold text-slate-950">{o.id}</div>
-                    <div className="font-medium text-slate-800">{p.name}</div>
-                    <div className="text-[11px] text-slate-400">{o.invoice ? o.invoice.no : 'Not invoiced'}</div>
-                  </td>
-                  <td className="py-3 px-3.5">
-                    <div className="font-mono font-bold text-slate-950">{it.code}</div>
-                    <div className="font-medium text-slate-800 truncate max-w-[180px]">{it.name}</div>
-                    <div className="text-[11px] text-slate-400">{c.godown} / {c.shelf}</div>
-                  </td>
-                  <td className="py-3 px-3.5 font-mono"><span className="bg-rose-50 text-rose-800 font-bold px-2 py-0.5 rounded border border-rose-200/80">{shortQty(c)}</span><span className="text-slate-400"> / {c.ordered}</span></td>
-                  <td className="py-3 px-3.5 font-mono font-semibold text-slate-900">{inr(shortQty(c) * it.rate, 0)}</td>
-                  <td className="py-3 px-3.5"><span className="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">{REASONS[c.reason]}</span></td>
-                  <td className="py-3 px-3.5 font-mono text-[11px]">{time(o.dispatchBy)}</td>
-                  <td className="py-3 px-3.5"><StatusBadge status={st} /></td>
-                  <td className="py-3 px-3.5 text-right">
-                    <button id={`btn-open-${c.id}`} onClick={() => onOpen(c.id)} className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded text-xs font-semibold inline-flex items-center space-x-1 cursor-pointer transition-colors shadow-2xs">
-                      <span>{st === 'AWAITING_OWNER' ? 'Decide' : st === 'MESSAGE_PENDING' ? 'Message' : 'View'}</span><ArrowRight className="w-3 h-3" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!shown.length && <tr><td colSpan={9} className="py-8 text-center text-slate-400 text-xs">No cases match this filter.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {shown.map(({ o, st, cases }: any) => {
+          const p = party(o.party);
+          const value = cases.reduce((n: number, c: any) => n + shortQty(c) * item(c.item).rate, 0);
+          const due = dueText(o.dispatchBy, now);
+          return (
+            <div key={o.id} id={`order-card-${o.id}`} className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center space-x-2"><span className="font-mono text-xs font-bold text-slate-950">{o.id}</span><span className="text-xs text-slate-400">•</span><span className="text-sm font-bold text-slate-900">{p.name}</span></div>
+                  <div className={`text-[11px] mt-0.5 flex items-center ${due.cls}`}><Clock className="w-3 h-3 mr-1" />{due.text}</div>
+                </div>
+                <StatusBadge status={st} />
+              </div>
+              <div className="space-y-1 text-xs">
+                {cases.map((c: any) => (
+                  <div key={c.id} className="flex items-center justify-between">
+                    <span className="text-slate-700 truncate">{item(c.item).name}</span>
+                    <span className="font-mono shrink-0 ml-2">{isFound(c) ? <span className="text-emerald-700">found</span> : <><span className="text-rose-700 font-bold">{shortQty(c)}</span><span className="text-slate-400"> / {c.ordered} short</span></>}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <span className="text-[11px] text-slate-500">Short value <span className="font-mono font-bold text-slate-900">{inr(value, 0)}</span> • {o.invoice ? o.invoice.no : 'Not invoiced'}</span>
+                <button id={`btn-open-${o.id}`} onClick={() => onOpen(o.id)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center space-x-1 cursor-pointer shadow-2xs">
+                  <span>{st === 'AWAITING_OWNER' ? 'Decide' : st === 'MESSAGE_PENDING' ? 'Send message' : 'View'}</span><ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {!shown.length && <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">Nothing needs you right now.</div>}
       </div>
     </div>
   );
 }
 
-function billImpact(c, order, outcome) {
-  const it = item(c.item);
-  const p = party(order.party);
-  const sq = shortQty(c);
-  const tax = (q) => taxLines([{ qty: q, rate: it.rate, gst: it.gst }], p).total;
-  if (outcome === 'source') return 'No change to the bill. Order ships in full once the sourced units arrive.';
-  const q = outcome === 'cancel_line' ? c.ordered : sq;
-  if (order.invoice) {
-    const extra = outcome === 'backorder' ? ' Invoice the balance when it ships (confirm the approach with your CA).' : '';
-    return `Credit note for ${q} × ${inr(it.rate, 0)} + GST = ${inr(tax(q))} against ${order.invoice.no}.${extra}`;
-  }
-  return `Not invoiced yet: the invoice will be drafted for the quantity shipped, ${inr(tax(q))} less than ordered.`;
-}
-
-function CaseDetail({ caseId, onBack, go }) {
+function OrderDetail({ orderId, onBack, go }: { orderId: string; onBack: () => void; go: Go }) {
   const { state, dispatch } = useStore();
-  const c = state.cases.find((x) => x.id === caseId);
-  const [choice, setChoice] = useState(null);
-  const [supplier, setSupplier] = useState('');
-  const [eta, setEta] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  if (!c) return null;
-  const st = caseStatus(state, c);
-  const o = state.orders.find((x) => x.id === c.orderId);
-  const it = item(c.item);
+  const now = useNow(1000);
+  const o = state.orders.find((x: any) => x.id === orderId);
+  const os = orderState(state, orderId);
+  const cases = orderCases(state, orderId);
+  const st = orderStatus(state, o);
   const p = party(o.party);
-  const drafts = caseDrafts(state, c.id).concat(state.drafts.filter((d) => d.caseIds?.includes(c.id) && d.caseId !== c.id));
-  const rc = caseRecount(state, c);
-  const choices = ['partial', 'backorder', 'source', 'cancel_line'];
-  const canConfirm = choice && (choice !== 'source' || supplier.trim());
+  const open = cases.filter((c: any) => !c.outcome);
+  const canDecide = os.picked && open.length > 0 && open.every((c: any) => c.escalatedAt);
 
-  const waLink = c.message ? `https://wa.me/?text=${encodeURIComponent(c.message.text)}` : '#';
+  const [lines, setLines] = useState<Record<string, any>>({});
+  const [choice, setChoice] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [audit, setAudit] = useState<string | null>(null);
+
+  const setLine = (id: string, patch: any) => setLines((x) => ({ ...x, [id]: { ...x[id], ...patch } }));
+  const complete = open.every((c: any) => {
+    const d = lines[c.id];
+    if (!d?.outcome) return false;
+    if (d.outcome === 'source') return Boolean(d.sourcing?.supplier?.trim());
+    if (d.outcome === 'substitute') return Boolean(d.substitute?.item) && d.substitute.qty >= 1;
+    return true;
+  });
+  const preview = complete ? billChange(state, o, lines) : null;
+  const route = correctionRoute(state, o, now);
+  const drafts = orderDrafts(state, orderId);
+  const due = dueText(o.dispatchBy, now);
 
   return (
     <div className="space-y-5 max-w-6xl mx-auto w-full pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
         <div className="flex items-center space-x-3">
-          <button onClick={onBack} className="p-1.5 rounded-md hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer" title="Return to queue"><ArrowLeft className="w-4 h-4" /></button>
+          <button onClick={onBack} className="p-1.5 rounded-md hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer" title="Back"><ArrowLeft className="w-4 h-4" /></button>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-mono text-xs font-bold text-slate-950 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{c.id}</span>
-              <span className="text-xs text-slate-400">•</span>
-              <span className="text-sm font-bold text-slate-900">{it.name}</span>
+              <span className="font-mono text-xs font-bold text-slate-950 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{o.id}</span>
+              <span className="text-sm font-bold text-slate-900">{p.name}, {p.city}</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Reported {dateTime(c.reportedAt)} by the picker • Order {o.id} for {p.name}</p>
+            <p className={`text-[11px] mt-0.5 ${due.cls}`}>{due.text} • {o.invoice ? `Invoice ${o.invoice.no}` : 'Not invoiced yet'}</p>
           </div>
         </div>
         <StatusBadge status={st} />
@@ -151,142 +133,167 @@ function CaseDetail({ caseId, onBack, go }) {
 
       <div className="bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 flex items-center space-x-2 text-xs text-slate-700">
         <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0" />
-        <span><strong>Operating principle:</strong> StockTrace drafts. The owner decides, and nothing reaches Tally until the accountant approves it.</span>
+        <span><strong>You decide, once for the whole order.</strong> StockTrace drafts the message and the bill correction; the accountant approves before anything goes into Tally.</span>
       </div>
-
-      {c.returnedNote && !c.outcome && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2 text-xs text-amber-900 flex items-center space-x-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" /><span><strong>Returned by accountant.</strong> {c.returnedNote}. Choose the outcome again.</span>
-        </div>
+      {os.returnedNote && !os.decision && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2 text-xs text-amber-900 flex items-center space-x-2"><AlertTriangle className="w-4 h-4 shrink-0" /><span><strong>Returned by accountant.</strong> {os.returnedNote}. Decide again.</span></div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <Panel eyebrow="Case summary" title={`${it.code} • ${c.godown} / ${c.shelf}`} className="lg:col-span-3">
-          <div className="space-y-2.5 text-xs">
-            <Field label="Customer">{p.name}, {p.city}</Field>
-            <Field label="Invoice">{o.invoice ? `${o.invoice.no} (${new Date(o.invoice.date).toLocaleDateString('en-IN')})` : 'Not invoiced yet'}</Field>
-            <Field label="Ordered / found / short"><span className="font-mono">{c.ordered} / {totalFound(c)} / <span className="text-rose-700">{shortQty(c)}</span></span></Field>
-            <Field label="Reason">{REASONS[c.reason]}</Field>
-            <Field label="Unit rate (excl. GST)"><span className="font-mono">{inr(it.rate)}</span></Field>
-            <Field label="Short value (excl. GST)"><span className="font-mono">{inr(shortQty(c) * it.rate)}</span></Field>
-            <Field label="Dispatch by">{dateTime(o.dispatchBy)}</Field>
-          </div>
-          <div className="pt-2 border-t border-slate-100 space-y-2">
-            <div className="text-slate-700 text-xs font-bold">Audit trail ({c.audit.length} events)</div>
-            <AuditTrail audit={c.audit} />
-          </div>
-        </Panel>
-
-        <Panel eyebrow="Quick search" title="Places checked, from Tally records" right={<span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold">Cited records only</span>} className="lg:col-span-5">
-          {c.reason === 'damaged' ? (
-            <div className="p-3 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-700">Damaged stock is in hand, so no search was needed. A stock journal moving it to Damaged Goods is drafted when you decide.</div>
-          ) : c.suggestions.length === 0 ? (
-            <div className="p-3 bg-slate-100 border border-slate-200 rounded-lg text-xs space-y-1">
-              <div className="font-bold text-slate-800">No other location on record</div>
-              <p className="text-slate-700 text-[11px] leading-relaxed">No Tally stock summary or recent stock journal shows {it.code} anywhere except {c.godown} / {c.shelf}. StockTrace did not suggest a place to look.</p>
-            </div>
-          ) : (
-            <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden text-[11px]">
-              {c.suggestions.map((s) => (
-                <div key={s.key} className="p-2.5 border-b border-slate-200 last:border-b-0 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-900 flex items-center"><MapPin className="w-3 h-3 mr-1 text-teal-700" />{s.key}</span>
-                    <span className={`font-mono font-bold ${s.result === 'found' ? 'text-emerald-700' : s.result ? 'text-slate-500' : 'text-sky-700'}`}>{s.result === 'found' ? `Found ${s.foundQty}` : s.result ? 'Not here' : 'Not checked'}</span>
+        <div className="lg:col-span-7 space-y-4">
+          {cases.map((c: any) => {
+            const it = item(c.item);
+            const d = lines[c.id] || {};
+            const subs = substitutesFor(state, c.item);
+            const rc = caseRecount(state, c);
+            return (
+              <div key={c.id} id={`case-${c.id}`} className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">{it.name}</div>
+                    <div className="text-[11px] text-slate-500"><span className="font-mono">{c.id}</span> • {c.godown} / {c.shelf} • {REASONS[c.reason]}</div>
                   </div>
-                  <div className="text-slate-500 font-mono text-[10px]">{s.source}</div>
+                  <div className="text-right font-mono text-xs shrink-0">
+                    <div><span className="text-slate-400">found</span> {totalFound(c)}/{c.ordered}</div>
+                    {!isFound(c) && <div className="text-rose-700 font-bold">{shortQty(c)} short • {inr(shortQty(c) * it.rate, 0)}</div>}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-          {st === 'SEARCHING' && (
-            <div className="text-xs text-slate-600 flex items-center justify-between">
-              <span>Picker is searching. Time left: <strong className="font-mono">{mins(Math.min(c.searchDeadline - now, c.searchDeadline - c.reportedAt))}</strong></span>
-              <button onClick={() => dispatch({ type: 'ESCALATE', caseId: c.id, why: 'owner' })} className="text-slate-700 underline cursor-pointer">Stop search and decide</button>
-            </div>
-          )}
-          <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
-            <div className="flex items-center space-x-1.5 font-bold text-slate-700"><ClipboardList className="w-3.5 h-3.5" /><span>Recount</span></div>
-            {!rc ? <p className="text-[11px] text-slate-500">No recount for damaged stock.</p> : rc.status === 'open' ? (
-              <p className="text-[11px] text-slate-600">Task <span className="font-mono">{rc.id}</span> open: picker to count {c.godown} / {c.shelf}.</p>
-            ) : (
-              <p className="text-[11px] text-slate-600">Counted <strong className="font-mono">{rc.counted}</strong> vs book <strong className="font-mono">{rc.book}</strong>{rc.diff ? `: ${rc.diff < 0 ? `${-rc.diff} confirmed missing` : `${rc.diff} more than book`}, physical stock draft sent to the accountant.` : ': matches book.'}</p>
-            )}
-            {c.recountNote && <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900">{c.recountNote}</div>}
-          </div>
-        </Panel>
 
-        <Panel eyebrow="Resolution" title={c.outcome ? 'Decision and follow-up' : 'Choose what happens to this order'} className="lg:col-span-4">
-          {!c.outcome && st === 'AWAITING_OWNER' && (
-            <div className="space-y-2">
-              {choices.map((k) => (
-                <label key={k} id={`outcome-${k}`} className={`block p-2.5 rounded-lg border cursor-pointer transition-colors ${choice === k ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                  <div className="flex items-center space-x-2">
-                    <input type="radio" name="outcome" checked={choice === k} onChange={() => setChoice(k)} className="accent-slate-900" />
-                    <span className="text-xs font-bold text-slate-900">{OUTCOMES[k]}</span>
+                {c.suggestions.length > 0 && (
+                  <div className="bg-slate-50 rounded-lg border border-slate-200 text-[11px] divide-y divide-slate-200">
+                    {c.suggestions.map((s: any) => (
+                      <div key={s.key} className="p-2 flex items-start justify-between gap-2">
+                        <span className="text-slate-600"><MapPin className="w-3 h-3 inline mr-1 text-teal-700" /><strong className="text-slate-900">{s.key}</strong> — {s.source}</span>
+                        <span className={`font-mono font-bold shrink-0 ${s.result === 'found' ? 'text-emerald-700' : s.result ? 'text-slate-500' : 'text-sky-700'}`}>{s.result === 'found' ? `+${s.foundQty}` : s.result ? 'not here' : 'checking'}</span>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1 ml-5 leading-relaxed">{billImpact(c, o, k)}</p>
-                  {k === 'source' && choice === 'source' && (
-                    <div className="ml-5 mt-2 grid grid-cols-2 gap-2">
-                      <input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Supplier (required)" className="text-xs p-1.5 rounded border border-slate-300 bg-white" />
-                      <input value={eta} onChange={(e) => setEta(e.target.value)} placeholder="Expected, e.g. today 4 pm" className="text-xs p-1.5 rounded border border-slate-300 bg-white" />
-                    </div>
-                  )}
-                </label>
-              ))}
-              {c.reason === 'damaged' && <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">Also drafted: stock journal moving {shortQty(c)} damaged {unitLabel(it.unit, shortQty(c))} to Damaged Goods.</p>}
-              <button id="btn-confirm-outcome" disabled={!canConfirm} onClick={() => dispatch({ type: 'DECIDE', caseId: c.id, outcome: choice, sourcing: choice === 'source' ? { supplier: supplier.trim(), eta: eta.trim() } : null, actor: 'Owner' })}
-                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-lg font-bold text-xs cursor-pointer disabled:cursor-not-allowed">Confirm decision</button>
-            </div>
-          )}
-          {st === 'SEARCHING' && <p className="text-xs text-slate-500">Waiting for the picker's quick search. You can stop it and decide now.</p>}
+                )}
+                {c.escalation === 'no_records' && <p className="text-[11px] text-slate-500">No Tally record shows this item anywhere else, so no place was suggested.</p>}
 
-          {c.outcome && (
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-[11px] text-slate-500 block">Outcome</span>
-                <div className="font-bold text-slate-900">{OUTCOMES[c.outcome.type]}</div>
-                <div className="text-[11px] text-slate-500">{c.outcome.actor} • {dateTime(c.outcome.at)}{c.outcome.sourcing ? ` • ${c.outcome.sourcing.supplier}` : ''}</div>
+                {!c.outcome && !c.escalatedAt && (
+                  <div className="text-xs text-sky-800 bg-sky-50 border border-sky-200 rounded-lg p-2 flex items-center justify-between">
+                    <span>Picker is checking ({Math.max(0, Math.ceil((c.searchDeadline - now) / 60000))} min left)</span>
+                    <button onClick={() => dispatch({ type: 'ESCALATE', caseId: c.id, why: 'owner', actor: 'Owner' })} className="underline cursor-pointer">Stop search</button>
+                  </div>
+                )}
+
+                {isFound(c) && <div className="text-xs font-semibold text-emerald-700 flex items-center"><CheckCircle2 className="w-4 h-4 mr-1" />Found during the search. Nothing to decide.</div>}
+
+                {!c.outcome && c.escalatedAt && (
+                  <div className="space-y-1.5">
+                    {['partial', 'backorder', 'substitute', 'source', 'cancel_line'].map((k) => {
+                      const disabled = k === 'substitute' && !subs.length;
+                      return (
+                        <label key={k} id={`outcome-${c.id}-${k}`} className={`block p-2 rounded-lg border ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${d.outcome === k ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                          <div className="flex items-center space-x-2">
+                            <input type="radio" disabled={disabled} name={`o-${c.id}`} checked={d.outcome === k} onChange={() => setLine(c.id, { outcome: k, ...(k === 'substitute' && subs[0] ? { substitute: { item: subs[0].code, qty: Math.min(shortQty(c), subs[0].qty) } } : {}) })} className="accent-slate-900" />
+                            <span className="text-xs font-bold text-slate-900">{OUTCOMES[k]}</span>
+                            {k === 'partial' && <span className="text-[11px] text-slate-500">send {totalFound(c)}</span>}
+                            {k === 'substitute' && !subs.length && <span className="text-[11px] text-slate-500">no substitute in stock</span>}
+                          </div>
+                          {k === 'substitute' && d.outcome === 'substitute' && (
+                            <div className="ml-5 mt-2 flex flex-wrap items-center gap-2 text-xs">
+                              <select value={d.substitute?.item} onChange={(e) => setLine(c.id, { substitute: { ...d.substitute, item: e.target.value } })} className="p-1.5 rounded border border-slate-300 bg-white">
+                                {subs.map((s: any) => <option key={s.code} value={s.code}>{item(s.code).name} ({s.qty} in stock, {inr(item(s.code).rate, 0)})</option>)}
+                              </select>
+                              <input type="number" min="1" max={subs.find((s: any) => s.code === d.substitute?.item)?.qty} value={d.substitute?.qty ?? ''} onChange={(e) => setLine(c.id, { substitute: { ...d.substitute, qty: Math.max(1, Math.floor(Number(e.target.value) || 1)) } })} className="w-16 p-1.5 rounded border border-slate-300 font-mono" />
+                            </div>
+                          )}
+                          {k === 'source' && d.outcome === 'source' && (
+                            <div className="ml-5 mt-2 grid grid-cols-2 gap-2">
+                              <input value={d.sourcing?.supplier || ''} onChange={(e) => setLine(c.id, { sourcing: { ...d.sourcing, supplier: e.target.value } })} placeholder="From (required)" className="text-xs p-1.5 rounded border border-slate-300 bg-white" />
+                              <input value={d.sourcing?.eta || ''} onChange={(e) => setLine(c.id, { sourcing: { ...d.sourcing, eta: e.target.value } })} placeholder="By when, e.g. 4 pm" className="text-xs p-1.5 rounded border border-slate-300 bg-white" />
+                            </div>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {c.outcome && !isFound(c) && (
+                  <div className="text-xs p-2 rounded-lg bg-slate-50 border border-slate-200"><span className="text-slate-500">Decided:</span> <strong>{OUTCOMES[c.outcome.type]}</strong>{c.outcome.substitute ? ` — ${c.outcome.substitute.qty} × ${item(c.outcome.substitute.item).name}` : ''}{c.outcome.sourcing ? ` — from ${c.outcome.sourcing.supplier}` : ''}</div>
+                )}
+
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                  <span>{rc ? (rc.status === 'done' ? `Recount: counted ${rc.counted} vs book ${rc.book}${rc.cause ? ` • ${ROOT_CAUSES[rc.cause]}` : ''}` : `Recount ${rc.id} with godown in-charge`) : 'Damaged: written off, no recount'}</span>
+                  <button onClick={() => setAudit(audit === c.id ? null : c.id)} className="underline cursor-pointer flex items-center">History {audit === c.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}</button>
+                </div>
+                {audit === c.id && <AuditTrail audit={c.audit} />}
               </div>
+            );
+          })}
+        </div>
 
-              {drafts.length > 0 && (
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-700 block">Paperwork for Tally</span>
-                  {drafts.map((d) => (
-                    <div key={d.id} className="flex items-center justify-between p-2 rounded border border-slate-200 bg-white">
-                      <span>{DRAFT_LABEL[d.type]} <span className="font-mono text-slate-500">{d.voucherNo || d.id}</span></span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${d.status === 'posted' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : d.status === 'rejected' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-violet-50 text-violet-800 border-violet-200'}`}>{d.status === 'pending' ? 'WITH ACCOUNTANT' : d.status.toUpperCase()}</span>
-                    </div>
-                  ))}
-                  {drafts.some((d) => d.status === 'pending') && <button onClick={() => go('accountant')} className="text-[11px] text-slate-600 underline cursor-pointer">Open accountant view</button>}
-                </div>
+        <div className="lg:col-span-5 space-y-4">
+          {!os.decision && (
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Customer and bill</div>
+              {!os.picked && <p className="text-xs text-slate-600">Waiting for the picker to finish this order. You can decide once it reaches packing.</p>}
+              {os.picked && !canDecide && open.length > 0 && <p className="text-xs text-slate-600">Waiting for the quick search to finish (or stop it on the item).</p>}
+              {canDecide && (
+                <>
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-bold text-slate-900 flex items-center"><Phone className="w-3.5 h-3.5 mr-1" />Did you speak to {p.name}?</div>
+                    {Object.entries(CUSTOMER_CHOICES).map(([k, v]) => (
+                      <label key={k} id={`choice-${k}`} className={`flex items-center space-x-2 p-2 rounded-lg border cursor-pointer text-xs ${choice === k ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                        <input type="radio" name="choice" checked={choice === k} onChange={() => setChoice(k)} className="accent-slate-900" /><span>{v}</span>
+                      </label>
+                    ))}
+                    <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional), e.g. Ravi OK with 98 today" className="w-full text-xs p-2 rounded-lg border border-slate-300" />
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1">
+                    <div className="font-bold text-slate-900">How the bill gets fixed</div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">{route.why}</p>
+                    {preview && <div className="font-mono text-[11px] text-slate-800">Bill {inr(preview.before)} → {inr(preview.after)} ({preview.diff >= 0 ? '+' : ''}{inr(preview.diff)})</div>}
+                  </div>
+                  <button id="btn-confirm-decision" disabled={!complete || !choice}
+                    onClick={() => dispatch({ type: 'DECIDE_ORDER', orderId, lines: Object.fromEntries(open.map((c: any) => [c.id, lines[c.id]])), customerChoice: choice, note, actor: 'Owner' })}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-lg font-bold text-sm cursor-pointer disabled:cursor-not-allowed">Confirm for whole order</button>
+                </>
               )}
-
-              {c.needsMessage && c.message && (
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-700 block">Customer message</span>
-                  <textarea id="owner-message" disabled={!!c.message.sentAt} value={c.message.text} onChange={(e) => dispatch({ type: 'MESSAGE_EDIT', caseId: c.id, text: e.target.value })}
-                    rows={7} className="w-full text-[11px] leading-relaxed p-2 rounded-lg border border-slate-300 bg-slate-50 disabled:text-slate-500" />
-                  {c.message.sentAt ? (
-                    <div className="text-[11px] text-emerald-700 font-bold flex items-center"><CheckCircle2 className="w-3.5 h-3.5 mr-1" />Shared on WhatsApp at {time(c.message.sentAt)}</div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      <a id="btn-share-whatsapp" href={waLink} target="_blank" rel="noreferrer" onClick={() => dispatch({ type: 'MESSAGE_SENT', caseId: c.id, actor: 'Owner' })}
-                        className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"><MessageCircle className="w-3.5 h-3.5" /><span>Share on WhatsApp</span></a>
-                      <button onClick={() => { try { navigator.clipboard.writeText(c.message.text); setCopied(true); } catch { /* ignore */ } }}
-                        className="py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer"><Copy className="w-3.5 h-3.5" /><span>{copied ? 'Copied' : 'Copy text'}</span></button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {c.outcome.type === 'source' && !c.sourcingReceivedAt && (
-                <button onClick={() => dispatch({ type: 'SOURCED_RECEIVED', caseId: c.id, actor: 'Owner' })} className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer"><PackageCheck className="w-3.5 h-3.5" /><span>Mark sourced units received</span></button>
-              )}
-              {st === 'CLOSED' && <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] font-semibold">Case closed. It stays in the discrepancy log as a read-only record.</div>}
             </div>
           )}
-        </Panel>
+
+          {os.decision && (
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3 text-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Customer message (one for the order)</div>
+              <div className="text-[11px] text-slate-500">{CUSTOMER_CHOICES[os.decision.customerChoice]}{os.decision.note ? ` — "${os.decision.note}"` : ''} • {dateTime(os.decision.at)}</div>
+              <textarea id="owner-message" disabled={!!os.message?.sentAt} value={os.message?.text || ''} onChange={(e) => dispatch({ type: 'MESSAGE_EDIT', orderId, text: e.target.value })}
+                rows={9} className="w-full text-[11px] leading-relaxed p-2 rounded-lg border border-slate-300 bg-slate-50 disabled:text-slate-500" />
+              {os.message?.sentAt ? (
+                <div className="text-[11px] text-emerald-700 font-bold flex items-center"><CheckCircle2 className="w-3.5 h-3.5 mr-1" />Shared on WhatsApp at {time(os.message.sentAt)}</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <a id="btn-share-whatsapp" href={`https://wa.me/?text=${encodeURIComponent(os.message?.text || '')}`} target="_blank" rel="noreferrer" onClick={() => dispatch({ type: 'MESSAGE_SENT', orderId, actor: 'Owner' })}
+                    className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"><MessageCircle className="w-3.5 h-3.5" /><span>Share on WhatsApp</span></a>
+                  <button onClick={() => { try { navigator.clipboard.writeText(os.message?.text || ''); setCopied(true); } catch { /* ignore */ } }}
+                    className="py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer"><Copy className="w-3.5 h-3.5" /><span>{copied ? 'Copied' : 'Copy text'}</span></button>
+                </div>
+              )}
+              {os.decision.hasSource && !os.sourcingReceivedAt && (
+                <button onClick={() => dispatch({ type: 'SOURCED_RECEIVED', orderId, actor: 'Owner' })} className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer"><PackageCheck className="w-3.5 h-3.5" /><span>Arranged units received</span></button>
+              )}
+            </div>
+          )}
+
+          {drafts.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-2 text-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Paperwork for Tally</div>
+              {drafts.map((d: any) => (
+                <div key={d.id} className="flex items-center justify-between p-2 rounded border border-slate-200">
+                  <span>{DRAFT_LABEL[d.type]} <span className="font-mono text-slate-500">{d.id}</span></span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${d.status === 'approved' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : d.status === 'rejected' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-violet-50 text-violet-800 border-violet-200'}`}>{d.status === 'pending' ? 'WITH ACCOUNTANT' : d.status.toUpperCase()}</span>
+                </div>
+              ))}
+              {drafts.some((d: any) => d.status === 'pending') && <button onClick={() => go('accountant')} className="text-[11px] text-slate-600 underline cursor-pointer">Open accountant view</button>}
+            </div>
+          )}
+          {st === 'CLOSED' && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] font-semibold">Order closed. It stays in the discrepancy log as a read-only record.</div>}
+        </div>
       </div>
     </div>
   );
 }
+
