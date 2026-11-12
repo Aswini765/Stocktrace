@@ -8,6 +8,7 @@ import {
 import { taxLines, creditNoteDeadline } from '../src/lib/tax.ts';
 import { voucherXml } from '../src/lib/tally.ts';
 import { PARTIES } from '../src/data/seed.ts';
+import { findNumber, parseVoice } from '../src/lib/voice.ts';
 
 let passed = 0;
 const test = (name: string, fn: () => void) => { fn(); passed++; console.log(`  ✓ ${name}`); };
@@ -363,6 +364,30 @@ test('replaying the same events gives the same state on every device', () => {
   const a = events.reduce(reducer, buildInitialState());
   const b = events.reduce(reducer, buildInitialState(A + 999999));
   assert.deepEqual(a, b);
+});
+
+test('voice: numbers in digits of any script or as words, in English, Hindi and Kannada', () => {
+  assert.equal(findNumber('60'), 60);
+  assert.equal(findNumber('साठ'), 60);
+  assert.equal(findNumber('६०'), 60);
+  assert.equal(findNumber('೬೦'), 60);
+  assert.equal(findNumber('forty two found'), 42);
+  assert.equal(findNumber('बयालीस मिले'), 42);
+  assert.equal(findNumber('ನಲವತ್ತು ಎರಡು'), 42);
+  assert.equal(findNumber('ಇಪ್ಪತ್ತೈದು ಸಿಕ್ಕಿತು'), 25);
+  assert.equal(findNumber('not here'), null);
+});
+
+test('voice: commands for the short form, the search and the recount', () => {
+  const a = parseVoice('45 damaged'); assert.equal(a.qty, 45); assert.equal(a.reason, 'damaged');
+  assert.equal(parseVoice('60 कम है').reason, 'not_found');
+  assert.equal(parseVoice('भेजो').send, true);
+  const b = parseVoice('found 6'); assert.equal(b.found, true); assert.equal(b.qty, 6);
+  assert.equal(parseVoice('यहाँ नहीं है').notHere, true);
+  assert.equal(parseVoice('यहाँ नहीं है').found, false);
+  assert.equal(parseVoice('ಇಲ್ಲಿ ಇಲ್ಲ').notHere, true);
+  assert.equal(parseVoice('send to owner').owner, true);
+  assert.equal(parseVoice('save 42').send, true);
 });
 
 console.log(`\n${passed} tests passed`);

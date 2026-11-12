@@ -70,11 +70,6 @@ const T = {
     hi: 'ऑफ़लाइन: रिपोर्ट इस फ़ोन में सेव हैं, नेटवर्क आने पर भेज दी जाएँगी।',
     kn: 'ಆಫ್‌ಲೈನ್: ವರದಿಗಳನ್ನು ಈ ಫೋನ್‌ನಲ್ಲಿ ಉಳಿಸಲಾಗಿದೆ, ನೆಟ್‌ವರ್ಕ್ ಬಂದಾಗ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.',
   },
-  speakHint: {
-    en: 'Say the number found, then a reason: "not found", "damaged".',
-    hi: 'मिली संख्या बोलें, फिर कारण: "नहीं मिला", "खराब"।',
-    kn: 'ಸಿಕ್ಕ ಸಂಖ್ಯೆ ಹೇಳಿ, ನಂತರ ಕಾರಣ: "ಸಿಗಲಿಲ್ಲ", "ಹಾಳಾಗಿದೆ".',
-  },
   speak: { en: 'Speak', hi: 'बोलें', kn: 'ಮಾತನಾಡಿ' },
   listening: { en: 'Listening…', hi: 'सुन रहा है…', kn: 'ಕೇಳುತ್ತಿದೆ…' },
   done: { en: 'Done', hi: 'पूरा', kn: 'ಮುಗಿದಿದೆ' },
@@ -137,6 +132,18 @@ const T = {
   extraN: { en: '{n} more than expected', hi: '{n} ज़्यादा', kn: '{n} ಹೆಚ್ಚು' },
   wasShort: { en: 'Short', hi: 'कम', kn: 'ಕಡಿಮೆ' },
   pickedOf: { en: 'picked', hi: 'पिक', kn: 'ಪಿಕ್' },
+  mic_blocked: { en: 'Microphone is blocked. Allow it for this site in the browser settings (lock icon next to the address).', hi: 'माइक बंद है। ब्राउज़र सेटिंग में इस साइट के लिए माइक की अनुमति दें (पते के पास ताले वाला आइकन)।', kn: 'ಮೈಕ್ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ. ಬ್ರೌಸರ್ ಸೆಟ್ಟಿಂಗ್‌ನಲ್ಲಿ ಈ ಸೈಟ್‌ಗೆ ಮೈಕ್ ಅನುಮತಿಸಿ (ವಿಳಾಸದ ಪಕ್ಕದ ಬೀಗದ ಐಕಾನ್).' },
+  no_speech: { en: 'Did not hear anything. Tap the mic and speak again.', hi: 'कुछ सुनाई नहीं दिया। माइक दबाकर फिर बोलें।', kn: 'ಏನೂ ಕೇಳಿಸಲಿಲ್ಲ. ಮೈಕ್ ಒತ್ತಿ ಮತ್ತೆ ಮಾತನಾಡಿ.' },
+  no_mic: { en: 'No microphone found on this device.', hi: 'इस फ़ोन में माइक नहीं मिला।', kn: 'ಈ ಫೋನ್‌ನಲ್ಲಿ ಮೈಕ್ ಸಿಗಲಿಲ್ಲ.' },
+  voice_network: { en: 'Voice needs internet. Use the buttons, or try again when the signal is back.', hi: 'आवाज़ के लिए इंटरनेट चाहिए। बटन इस्तेमाल करें या नेटवर्क आने पर फिर कोशिश करें।', kn: 'ಧ್ವನಿಗೆ ಇಂಟರ್ನೆಟ್ ಬೇಕು. ಬಟನ್ ಬಳಸಿ ಅಥವಾ ನೆಟ್‌ವರ್ಕ್ ಬಂದಾಗ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.' },
+  lang_fallback: { en: 'This phone cannot recognise this language yet: listening in English instead.', hi: 'यह फ़ोन अभी यह भाषा नहीं पहचानता: अंग्रेज़ी में सुन रहे हैं।', kn: 'ಈ ಫೋನ್ ಈ ಭಾಷೆಯನ್ನು ಗುರುತಿಸುವುದಿಲ್ಲ: ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಕೇಳುತ್ತಿದೆ.' },
+  voice_failed: { en: 'Voice did not start. Use the buttons.', hi: 'आवाज़ शुरू नहीं हुई। बटन इस्तेमाल करें।', kn: 'ಧ್ವನಿ ಪ್ರಾರಂಭವಾಗಲಿಲ್ಲ. ಬಟನ್ ಬಳಸಿ.' },
+  voice_unsupported: { en: 'Voice works in Chrome on Android, or Safari on iPhone. This browser does not support it: use the buttons.', hi: 'आवाज़ Android पर Chrome या iPhone पर Safari में चलती है। इस ब्राउज़र में नहीं: बटन इस्तेमाल करें।', kn: 'ಧ್ವನಿ Android‌ನ Chrome ಅಥವಾ iPhone‌ನ Safari‌ನಲ್ಲಿ ಕೆಲಸ ಮಾಡುತ್ತದೆ. ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಇಲ್ಲ: ಬಟನ್ ಬಳಸಿ.' },
+  heard: { en: 'Heard', hi: 'सुना', kn: 'ಕೇಳಿದ್ದು' },
+  notUnderstood: { en: 'Did not catch a number or a command. Try again, e.g. "found 6" or "not here".', hi: 'संख्या या आदेश समझ नहीं आया। फिर बोलें, जैसे "6 मिले" या "नहीं है"।', kn: 'ಸಂಖ್ಯೆ ಅಥವಾ ಆದೇಶ ಅರ್ಥವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಹೇಳಿ, ಉದಾ. "6 ಸಿಕ್ಕಿತು" ಅಥವಾ "ಇಲ್ಲ".' },
+  speakHint: { en: 'Say the number found and why, e.g. "60, not on shelf" or "45 damaged". Say "send" to send.', hi: 'मिली संख्या और कारण बोलें, जैसे "60, कम है" या "45 खराब"। भेजने के लिए "भेजो" बोलें।', kn: 'ಸಿಕ್ಕ ಸಂಖ್ಯೆ ಮತ್ತು ಕಾರಣ ಹೇಳಿ, ಉದಾ. "60 ಕಡಿಮೆ" ಅಥವಾ "45 ಹಾಳಾಗಿದೆ". ಕಳುಹಿಸಲು "ಕಳುಹಿಸಿ" ಹೇಳಿ.' },
+  speakHintSearch: { en: 'At the first place to check, say "found 6", "not here", or "send to owner".', hi: 'पहली जगह पर बोलें: "6 मिले", "नहीं है", या "मालिक को भेजो"।', kn: 'ಮೊದಲ ಸ್ಥಳದಲ್ಲಿ ಹೇಳಿ: "6 ಸಿಕ್ಕಿತು", "ಇಲ್ಲ", ಅಥವಾ "ಮಾಲೀಕರಿಗೆ ಕಳುಹಿಸಿ".' },
+  speakHintCount: { en: 'Say the count, e.g. "42". Say "save" to save it.', hi: 'गिनती बोलें, जैसे "42"। सेव करने के लिए "सेव" बोलें।', kn: 'ಎಣಿಕೆ ಹೇಳಿ, ಉದಾ. "42". ಉಳಿಸಲು "ಉಳಿಸಿ" ಹೇಳಿ.' },
   decided: { en: 'owner decided', hi: 'मालिक ने तय किया', kn: 'ಮಾಲೀಕರು ನಿರ್ಧರಿಸಿದ್ದಾರೆ' },
   searchStill: { en: 'Still short', hi: 'अभी भी कम', kn: 'ಇನ್ನೂ ಕಡಿಮೆ' },
   cause_wrong_shelf: { en: 'Found on another shelf', hi: 'दूसरे शेल्फ पर मिला', kn: 'ಬೇರೆ ಶೆಲ್ಫ್‌ನಲ್ಲಿ ಸಿಕ್ಕಿತು' },
@@ -159,13 +166,4 @@ export const fill = (str, vars) => str.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?
 
 export const t = (key, lang) => T[key]?.[lang] || T[key]?.en || key;
 
-// Very small voice parser: a number and a reason keyword (English, Hindi, Kannada, and common romanised forms).
-export function parseVoice(text) {
-  const s = text.toLowerCase();
-  const num = s.match(/\d+/);
-  let reason = null;
-  if (/damag|broken|खराब|टूट|ಹಾಳ|kharab|haala/.test(s)) reason = 'damaged';
-  else if (/wrong|गलत|ತಪ್ಪು|galat|tappu/.test(s)) reason = 'wrong_item';
-  else if (/fewer|less|not found|missing|कम|नहीं मिला|ಕಡಿಮೆ|ಸಿಗಲಿಲ್ಲ|kam|kadime|nahi mila|sigalilla/.test(s)) reason = 'not_found';
-  return { qty: num ? Number(num[0]) : null, reason };
-}
+// Voice parsing lives in lib/voice.ts

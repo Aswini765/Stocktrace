@@ -1,11 +1,12 @@
 import type { Go } from './ui.tsx';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Volume2, ArrowRight, ChevronLeft, Check, Mic, MapPin, WifiOff, Minus, Plus, AlertTriangle, PackageCheck, ClipboardList, Truck, Undo2, ChevronDown, ChevronUp, PackagePlus } from 'lucide-react';
 import {
   useStore, item, party, shortQty, totalFound, lineCase, orderState, dispatchBlock, openRecountOnShelf, shippedLines, orderCases,
 } from '../store.tsx';
 import { LOCATIONS } from '../data/seed.ts';
-import { t, LANGS, parseVoice, unitWord, fill } from '../i18n.ts';
+import { t, LANGS, unitWord, fill } from '../i18n.ts';
+import { useVoice, parseVoice, type VoiceParse } from '../lib/voice.ts';
 import { mins, time, date } from '../lib/format.ts';
 
 function useNow(ms = 1000) {
@@ -47,6 +48,37 @@ function Bubble({ children, tone = 'bot' }: { children: React.ReactNode; tone?: 
   }
   const cls = tone === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-950' : tone === 'stop' ? 'bg-rose-50 border-rose-200 text-rose-950' : tone === 'go' ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-slate-50 border-slate-200 text-slate-800';
   return <div className={`rounded-2xl p-3.5 text-xs font-semibold leading-relaxed border shadow-2xs ${cls}`}>{children}</div>;
+}
+
+// One mic for the screen. onParse acts on what was heard and returns what it did (shown back to the
+// picker), or null if nothing usable was heard. Errors are always shown, never swallowed.
+function VoiceBar({ lang, hint, onParse }: { lang: string; hint: string; onParse: (p: VoiceParse) => string | null }) {
+  const handler = useRef(onParse);
+  handler.current = onParse;
+  const [msg, setMsg] = useState<string | null>(null);
+  const v = useVoice(lang, (alts) => {
+    for (const a of alts) {
+      const r = handler.current(parseVoice(a));
+      if (r) { setMsg(r); return; }
+    }
+    setMsg(t('notUnderstood', lang));
+  });
+  return (
+    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 space-y-1.5 text-xs text-emerald-950 shadow-2xs" id="voice-bar">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium">{hint}</span>
+        <button id="btn-voice" onClick={() => { setMsg(null); v.listening ? v.stop() : v.start(); }}
+          className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer border shadow-2xs ${v.listening ? 'bg-rose-600 border-rose-600 text-white animate-pulse' : 'bg-white border-emerald-300 text-emerald-900 hover:bg-emerald-100'}`}
+          aria-label={v.listening ? t('listening', lang) : t('speak', lang)}>
+          <Mic className="w-5 h-5" />
+        </button>
+      </div>
+      {v.listening && <div className="text-[11px] font-bold text-rose-700">{t('listening', lang)}</div>}
+      {v.heard && <div className="text-[11px] text-slate-700">{t('heard', lang)}: <strong>“{v.heard}”</strong></div>}
+      {msg && !v.listening && <div className="text-[11px] font-semibold text-emerald-900">{msg}</div>}
+      {v.error && <div className="text-[11px] font-semibold text-rose-700">{t(v.error, lang)}</div>}
+    </div>
+  );
 }
 
 const BADGE: Record<string, [string, string]> = {
@@ -319,23 +351,16 @@ function ShortForm({ lang, orderId, lineIdx, onCancel, onSent }: { lang: string;
   const it = item(l.item);
   const [found, setFound] = useState(0);
   const [reason, setReason] = useState<string | null>(null);
-  const [listening, setListening] = useState(false);
-  const SR = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-
-  const listen = () => {
-    if (!SR) return;
-    try {
-      const r = new SR();
-      r.lang = (LANGS as any)[lang].speech;
-      r.onresult = (e: any) => {
-        const { qty, reason: rs } = parseVoice(e.results[0][0].transcript);
-        if (qty != null && qty < l.qty) setFound(qty);
-        if (rs) setReason(rs);
-      };
-      r.onend = () => setListening(false);
-      setListening(true);
-      r.start();
-    } catch { setListening(false); }
+  const send = (f: number, r: string) => { dispatch({ type: 'REPORT_SHORT', orderId, lineIdx, found: f, reason: r, actor: 'Picker' }); onSent(); };
+  const onVoice = (p: VoiceParse) => {
+    const f = p.qty != null && p.qty < l.qty ? p.qty : null;
+    const r = p.reason;
+    if (f == null && !r && !p.send) return null;
+    if (f != null) setFound(f);
+    if (r) setReason(r);
+    const nf = f ?? found, nr = r ?? reason;
+    if (p.send && nr) { send(nf, nr); return null; }
+    return `${t('howMany', lang)} ${nf} • ${nr ? t(nr, lang) : '…'}`;
   };
 
   return (
@@ -363,17 +388,10 @@ function ShortForm({ lang, orderId, lineIdx, onCancel, onSent }: { lang: string;
           ))}
         </div>
       </div>
-      {SR && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between text-xs text-emerald-950 shadow-2xs">
-          <span className="text-[11px] font-medium">{t('speakHint', lang)}</span>
-          <button onClick={listen} className="ml-2 px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 cursor-pointer shrink-0 bg-white border border-emerald-300 text-emerald-900 hover:bg-emerald-100 shadow-2xs">
-            <Mic className="w-3.5 h-3.5" /><span>{listening ? t('listening', lang) : t('speak', lang)}</span>
-          </button>
-        </div>
-      )}
+      <VoiceBar lang={lang} hint={t('speakHint', lang)} onParse={onVoice} />
       <div className="grid grid-cols-2 gap-2">
         <button onClick={onCancel} className="py-3 rounded-xl text-sm font-bold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 cursor-pointer">{t('cancel', lang)}</button>
-        <button id="picker-btn-send-short" disabled={!reason} onClick={() => { dispatch({ type: 'REPORT_SHORT', orderId, lineIdx, found, reason, actor: 'Picker' }); onSent(); }}
+        <button id="picker-btn-send-short" disabled={!reason} onClick={() => send(found, reason!)}
           className="py-3 rounded-xl text-sm font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white cursor-pointer disabled:cursor-not-allowed">{t('send', lang)}</button>
       </div>
     </div>
@@ -395,6 +413,19 @@ function Search({ lang, orderId, lineIdx, caseId, now, onBack }: { lang: string;
   const [record, setRecord] = useState<string | null>(null);
   if (!c) return <Bubble tone="info">…</Bubble>;
   const it = item(c.item);
+  const target = c.suggestions.find((s: any) => !s.result);
+  const onVoice = (p: VoiceParse) => {
+    if (c.outcome) return null;
+    if (p.owner && !c.escalatedAt) { dispatch({ type: 'ESCALATE', caseId: c.id, why: 'picker', actor: 'Picker' }); return t('sentToOwner', lang); }
+    if (!target) return null;
+    if (p.notHere) { dispatch({ type: 'SEARCH_RESULT', caseId: c.id, locKey: target.key, result: 'not_here', actor: 'Picker' }); return `${target.key}: ${t('notHere', lang)}`; }
+    if (p.found || p.qty != null) {
+      const q = Math.max(1, Math.min(shortQty(c), p.qty ?? target.expected ?? 1));
+      dispatch({ type: 'SEARCH_RESULT', caseId: c.id, locKey: target.key, result: 'found', qty: q, actor: 'Picker' });
+      return `${target.key}: +${q}`;
+    }
+    return null;
+  };
   const remaining = Math.min(c.searchDeadline - now, c.searchDeadline - c.reportedAt);
   const searching = !c.outcome && !c.escalatedAt;
 
@@ -442,6 +473,7 @@ function Search({ lang, orderId, lineIdx, caseId, now, onBack }: { lang: string;
           ))}
         </div>
       )}
+      {!c.outcome && (target || !c.escalatedAt) && <VoiceBar lang={lang} hint={t('speakHintSearch', lang)} onParse={onVoice} />}
       {status}
       {searching && <button onClick={() => dispatch({ type: 'ESCALATE', caseId: c.id, why: 'picker', actor: 'Picker' })} className="w-full py-2.5 rounded-xl text-xs font-bold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 cursor-pointer">{t('sendNow', lang)}</button>}
       <button onClick={onBack} className="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white cursor-pointer">{t('back', lang)}: {c.orderId}</button>
@@ -454,9 +486,18 @@ function Recounts({ lang }: { lang: string }) {
   const list = state.recounts.filter((r: any) => r.status !== 'done');
   const [vals, setVals] = useState<Record<string, string>>({});
   const [moving, setMoving] = useState<Record<string, { at: string; qty: string }>>({});
+  const countable = list.find((r: any) => { const c = state.cases.find((x: any) => x.id === r.caseId); return r.status === 'open' && (!c || orderState(state, c.orderId).picked); });
+  const onVoice = (p: VoiceParse) => {
+    if (!countable) return null;
+    const v = p.qty != null ? String(p.qty) : vals[countable.id];
+    if (p.qty != null) setVals((x) => ({ ...x, [countable.id]: String(p.qty) }));
+    if (p.send && v != null && v !== '') { dispatch({ type: 'RECOUNT_DONE', recountId: countable.id, counted: Math.floor(Number(v)), actor: 'Godown in-charge' }); return `${countable.shelf}: ${v} ✓`; }
+    return p.qty != null ? `${countable.shelf}: ${p.qty}` : null;
+  };
   return (
     <div className="space-y-3">
       <Bubble>{list.length ? t('countGood', lang) : t('noTasks', lang)}</Bubble>
+      {countable && <VoiceBar lang={lang} hint={`${t('speakHintCount', lang)} (${countable.godown} / ${countable.shelf})`} onParse={onVoice} />}
       {list.map((r: any) => {
         const it = item(r.item);
         const c = state.cases.find((x: any) => x.id === r.caseId);
